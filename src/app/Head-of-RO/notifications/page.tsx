@@ -1,5 +1,5 @@
-import Sidebar from "@/components/sidebar";
-import Topbar from "@/components/topbar";
+import Sidebar from "@/components/Sidebar";
+import Topbar from "@/components/Topbar";
 import { NotificationList } from "@/components/Head-of-RO/notifications/NotificationList";
 
 export default function NotificationsPage() {

@@ -2,8 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { Search, Filter, Plus, Eye, Pencil, Trash2 } from "lucide-react";
-import Sidebar from "@/components/sidebar";
-import Topbar from "@/components/topbar";
+import Sidebar from "@/components/Sidebar";
+import Topbar from "@/components/Topbar";
 
 type Status = "Active" | "Inactive" | "Pending";
 

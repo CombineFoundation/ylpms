@@ -2,8 +2,8 @@
 
 import React from "react";
 import { CertificateList } from "@/components/Head-of-RO/certificates/CertificateList";
-import Sidebar from "@/components/sidebar";
-import Topbar from "@/components/topbar";
+import Sidebar from "@/components/Sidebar";
+import Topbar from "@/components/Topbar";
 
 
 export default function CertificatesPage() {

@@ -15,11 +15,7 @@
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "isolatedModules": true,
-<<<<<<< HEAD
     "jsx": "react-jsx",
-=======
-    "jsx": "preserve",
->>>>>>> 1e73fdf19f48948da2df67146715c8c701ed2296
     "incremental": true,
     "plugins": [
       {
@@ -37,14 +33,10 @@
     "**/*.ts",
     "**/*.tsx",
     ".next/types/**/*.ts",
-<<<<<<< HEAD
     ".next/dev/types/**/*.ts",
-    "src/components/RO/settings/SettingsContent"
+    "src/components/RO/settings/SettingsContent",
+    "next.config.mjs"
   ],
-=======
-    ".next/dev/types/**/*.ts"
-, "src/components/RO/settings/SettingsContent"  ],
->>>>>>> 1e73fdf19f48948da2df67146715c8c701ed2296
   "exclude": [
     "node_modules"
   ]

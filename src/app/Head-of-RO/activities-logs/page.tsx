@@ -1,8 +1,8 @@
 "use client";
 
 import React from "react";
-import Sidebar from "@/components/sidebar";
-import Topbar from "@/components/topbar";
+import Sidebar from "@/components/Sidebar";
+import Topbar from "@/components/Topbar";
 import { ActivityLogsList } from "@/components/Head-of-RO/activities-logs/ActivityLogsList";
 
 export default function ActivityLogsPage() {

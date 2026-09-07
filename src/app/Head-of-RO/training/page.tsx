@@ -2,8 +2,8 @@
 
 import React from "react";
 import { TrainingList } from "@/components/Head-of-RO/training/TrainingList";
-import Sidebar from "@/components/sidebar";
-import Topbar from "@/components/topbar";
+import Sidebar from "@/components/Sidebar";
+import Topbar from "@/components/Topbar";
 
 export default function TrainingPage() {
   return (

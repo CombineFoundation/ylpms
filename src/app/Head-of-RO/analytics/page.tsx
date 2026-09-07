@@ -1,7 +1,7 @@
 "use client";
 
-import Sidebar from "@/components/sidebar";
-import Topbar from "@/components/topbar";
+import Sidebar from "@/components/Sidebar";
+import Topbar from "@/components/Topbar";
 import { AnalyticsContent } from "@/components/Head-of-RO/analytics/AnalyticsContent";
 
 export default function AnalyticsPage() {

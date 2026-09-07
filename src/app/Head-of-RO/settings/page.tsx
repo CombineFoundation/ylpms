@@ -1,6 +1,6 @@
 // app/settings/page.tsx
-import Sidebar from '@/components/sidebar';
-import Topbar from '@/components/topbar';
+import Sidebar from '@/components/Sidebar';
+import Topbar from '@/components/Topbar';
 import { SettingsForm } from '@/components/Head-of-RO/SettingsForm';
 
 export default function SettingsPage() {
