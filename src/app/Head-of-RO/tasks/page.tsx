@@ -1,8 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import Sidebar from "@/components/sidebar";
-import Topbar from "@/components/topbar";
+import Sidebar from "@/components/Sidebar";
+import Topbar from "@/components/Topbar";
 import { TaskHeader } from "@/components/Head-of-RO/tasks/TaskHeader";
 import { TaskToolbar } from "@/components/Head-of-RO/tasks/TaskToolbar";
 import { TaskTable } from "@/components/Head-of-RO/tasks/TaskTable";

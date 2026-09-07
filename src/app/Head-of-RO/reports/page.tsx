@@ -1,7 +1,7 @@
 "use client";
 
-import Sidebar from "@/components/sidebar";
-import Topbar from "@/components/topbar";
+import Sidebar from "@/components/Sidebar";
+import Topbar from "@/components/Topbar";
 import { ReportList } from "@/components/Head-of-RO/reports/ReportList";
 
 export default function ReportsPage() {

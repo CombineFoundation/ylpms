@@ -1,7 +1,7 @@
 "use client";
 
-import Sidebar from "@/components/sidebar";
-import Topbar from "@/components/topbar";
+import Sidebar from "@/components/Sidebar";
+import Topbar from "@/components/Topbar";
 import { DashboardContent } from "@/components/Head-of-RO/dashboard/DashboardContent";
 
 export default function DashboardPage() {

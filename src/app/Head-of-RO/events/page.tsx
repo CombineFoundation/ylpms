@@ -1,7 +1,7 @@
 "use client";
 
-import Sidebar from "@/components/sidebar";
-import Topbar from "@/components/topbar";
+import Sidebar from "@/components/Sidebar";
+import Topbar from "@/components/Topbar";
 import { EventList } from "@/components/Head-of-RO/events/EventList";
 
 export default function EventsPage() {

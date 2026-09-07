@@ -2,7 +2,7 @@
 
 import { LayoutGrid, Search, Bell, Mail, ChevronRight } from "lucide-react";
 
-export function TopBar() {
+export function Topbar() {
   return (
     <header className="flex items-center justify-between border-b border-slate-100 bg-white px-8 py-4">
       <div className="flex items-center gap-2 text-sm text-slate-400">
