@@ -28,6 +28,7 @@ const navItems = [
   { label: "Volunteers", href: "/Head-of-RO/volunteers", icon: Link2 },
   { label: "Tasks", href: "/Head-of-RO/tasks", icon: ClipboardList },
   { label: "Events", href: "/Head-of-RO/events", icon: Calendar },
+<<<<<<< HEAD
   { label: "Activities", href: "/Head-of-RO/activities", icon: Calendar },
   { label: "Reports", href: "/Head-of-RO/reports", icon: FileText },
   { label: "Analytics", href: "/Head-of-RO/analytics", icon: BarChart3 },
@@ -35,6 +36,11 @@ const navItems = [
   { label: "Certificates", href: "/Head-of-RO/certificates", icon: FileText },
   { label: "Trainings", href: "/Head-of-RO/training", icon: Calendar },
   { label: "Activities Logs", href: "/Head-of-RO/activities-logs", icon: Calendar },
+=======
+  { label: "Reports", href: "/Head-of-RO/reports", icon: FileText },
+  { label: "Analytics", href: "/Head-of-RO/analytics", icon: BarChart3 },
+  { label: "Notifications", href: "/Head-of-RO/notifications", icon: Bell, badge: 2 },
+>>>>>>> 1e73fdf19f48948da2df67146715c8c701ed2296
   { label: "Settings", href: "/Head-of-RO/settings", icon: Settings },
 ];
 
