@@ -19,7 +19,7 @@ export default function LoginContent() {
   return (
     <div className="min-h-screen w-full flex flex-col lg:flex-row">
       {/* Left panel */}
-      <div className="relative w-full lg:w-1/2 min-h-[500px] lg:min-h-screen bg-[#E8622C] overflow-hidden flex flex-col">
+      <div className="relative w-full lg:w-1/2 min-h-125 lg:min-h-screen bg-[#E8622C] overflow-hidden flex flex-col">
         {/* subtle diagonal shading in the lower right, matching the reference */}
         <div className="pointer-events-none absolute -bottom-24 -right-24 w-[420px] h-[420px] bg-black/10 rounded-full blur-3xl" />
         <div className="pointer-events-none absolute bottom-0 right-0 w-2/3 h-1/2 bg-gradient-to-tl from-black/20 to-transparent" />
