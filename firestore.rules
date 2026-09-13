@@ -1,0 +1,25 @@
+rules_version = '2';
+
+// Assumed data model: users/{Firebase Auth UID} stores private email, name,
+// role, and active fields. Profiles and roles are provisioned by trusted admin
+// code only; clients can never assign or change a role.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    match /users/{userId} {
+      allow read: if isOwner(userId);
+      allow create, update, delete: if false;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

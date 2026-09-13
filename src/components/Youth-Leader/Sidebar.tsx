@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { SignOutButton } from "@/components/auth/SignOutButton";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
@@ -14,7 +15,6 @@ import {
   Bell,
   User,
   Settings,
-  LogOut,
   Menu,
   X,
   ChevronRight,
@@ -172,13 +172,7 @@ export default function Sidebar() {
             <p className="text-sm font-semibold text-white truncate">Zainab Ali</p>
             <p className="text-[11px] text-white/70 truncate">Youth Leader</p>
           </div>
-          <button
-            type="button"
-            aria-label="Log out"
-            className="text-white/70 hover:text-white transition-colors"
-          >
-            <LogOut className="h-4 w-4" />
-          </button>
+          <SignOutButton className="text-white/70 hover:text-white transition-colors" />
         </div>
       </aside>
     </>

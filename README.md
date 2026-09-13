@@ -31,7 +31,7 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 
 ## Firebase Backend
 
-This project uses Firebase for authentication and Firestore. Create a `.env.local` file in the project root with:
+This project uses Firebase Authentication, Firestore, and Storage. Create a `.env.local` file in the project root with:
 
 ```env
 NEXT_PUBLIC_FIREBASE_API_KEY=your_firebase_api_key
@@ -40,8 +40,10 @@ NEXT_PUBLIC_FIREBASE_PROJECT_ID=your_project_id
 NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=your_project.appspot.com
 NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=your_messaging_sender_id
 NEXT_PUBLIC_FIREBASE_APP_ID=your_app_id
-GMAIL_USER=your_gmail_address@gmail.com
-GMAIL_APP_PASSWORD=your_gmail_app_password
+NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID=your_measurement_id
+FIREBASE_PROJECT_ID=your_project_id
+FIREBASE_CLIENT_EMAIL=firebase-adminsdk-...@your_project.iam.gserviceaccount.com
+FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\\n...\\n-----END PRIVATE KEY-----\\n"
 ```
 
 Then run:
@@ -50,6 +52,22 @@ Then run:
 npm install
 npm run dev
 ```
+
+Enable **Email/Password** under Firebase Authentication providers. For every
+Firebase Authentication user, create a matching Firestore document at
+`users/{firebaseAuthUid}` from a trusted environment. Client apps must never be
+allowed to select their own role or reporting manager.
+
+Supported roles are `developer`, `Head RO`, `SRO`, `RO`, `Youth Leader`, and
+`Volunteer`. The `developer` role is a superuser role: it can access every
+portal route and manage every user profile.
+The Firebase Auth UID must be the Firestore document ID. Never store passwords
+in Firestore; Firebase Authentication stores and verifies them securely.
+
+The `FIREBASE_*` variables without the `NEXT_PUBLIC_` prefix are server-only
+Firebase Admin service-account credentials. They are required for the secure
+HTTP-only session cookie that protects portal routes before page content is
+rendered. Do not expose them to the browser or commit them to source control.
 
 ## Deploy on Vercel
 

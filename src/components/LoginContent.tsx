@@ -1,19 +1,41 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Eye, EyeOff, Mail, Lock } from "lucide-react";
 import ForgotPasswordModal from "./ForgotPasswordModal";
+import { useAuth } from "@/contexts/AuthContext";
+import { dashboardPathForRole } from "@/lib/auth";
 
 export default function LoginContent() {
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isForgotOpen, setIsForgotOpen] = useState(false);
+  const [formError, setFormError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const router = useRouter();
+  const { signIn, status, profile } = useAuth();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  useEffect(() => {
+    if (status === "authenticated" && profile) {
+      router.replace(dashboardPathForRole(profile.role));
+    }
+  }, [profile, router, status]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Wire up your auth logic here
-    console.log({ email, password });
+    setFormError("");
+    setIsSubmitting(true);
+
+    try {
+      const userProfile = await signIn(email.trim(), password);
+      router.replace(dashboardPathForRole(userProfile.role));
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : "Unable to sign in.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -182,11 +204,18 @@ export default function LoginContent() {
               </div>
             </div>
 
+            {formError && (
+              <p className="text-sm font-medium text-red-600" role="alert">
+                {formError}
+              </p>
+            )}
+
             <button
               type="submit"
-              className="w-full rounded-full bg-[#E8622C] py-3 text-sm font-semibold text-white hover:bg-[#d9551f] transition-colors focus:outline-none focus:ring-2 focus:ring-[#E8622C]/50 focus:ring-offset-2"
+              disabled={isSubmitting}
+              className="w-full rounded-full bg-[#E8622C] py-3 text-sm font-semibold text-white hover:bg-[#d9551f] disabled:cursor-not-allowed disabled:bg-gray-300 transition-colors focus:outline-none focus:ring-2 focus:ring-[#E8622C]/50 focus:ring-offset-2"
             >
-              Sign In
+              {isSubmitting ? "Signing in..." : "Sign In"}
             </button>
           </form>
         </div>

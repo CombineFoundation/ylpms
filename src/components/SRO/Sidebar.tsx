@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { SignOutButton } from "@/components/auth/SignOutButton";
 import { usePathname } from "next/navigation";
 import {
   LayoutGrid,
@@ -130,6 +131,7 @@ export default function Sidebar() {
             <p className="text-sm font-semibold text-white truncate">Sarah Johnson</p>
             <p className="text-[11px] text-white/70 truncate">Senior RO</p>
           </div>
+          <SignOutButton className="text-white/70 hover:text-white" />
         </div>
       </aside>
     </>

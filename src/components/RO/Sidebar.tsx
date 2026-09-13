@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { SignOutButton } from "@/components/auth/SignOutButton";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
@@ -15,7 +16,6 @@ import {
   BarChart2,
   Bell,
   Settings,
-  LogOut,
   Menu,
   X,
 } from "lucide-react";
@@ -142,13 +142,7 @@ export default function Sidebar() {
             </p>
             <p className="text-[11px] text-white/70 truncate">Region IV-A Officer</p>
           </div>
-          <button
-            type="button"
-            aria-label="Log out"
-            className="text-white/70 hover:text-white"
-          >
-            <LogOut className="h-4 w-4" />
-          </button>
+          <SignOutButton className="text-white/70 hover:text-white" />
         </div>
       </aside>
     </>

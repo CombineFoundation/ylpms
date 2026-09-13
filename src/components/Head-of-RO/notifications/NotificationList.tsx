@@ -1,50 +1,42 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { NotificationItem } from "@/components/Head-of-RO/NotificationItem";
-
-const initialNotifications = [
-  {
-    id: 1,
-    title: "Pedro Manalo submitted a new report for approval.",
-    time: "2h ago",
-    unread: true,
-  },
-  {
-    id: 2,
-    title: "Task 'Update volunteer database' was marked as done.",
-    time: "5h ago",
-    unread: true,
-  },
-  {
-    id: 3,
-    title: "New RO Liza Ramos registered and awaiting assignment.",
-    time: "1d ago",
-    unread: false,
-  },
-  {
-    id: 4,
-    title: "National Volunteer Summit is in 21 days.",
-    time: "1d ago",
-    unread: false,
-  },
-  {
-    id: 5,
-    title: "Ana Cruz's analytics report needs your review.",
-    time: "2d ago",
-    unread: false,
-  },
-];
+import {
+  HEAD_RO_NOTIFICATIONS_STORAGE_KEY,
+  HEAD_RO_NOTIFICATIONS_UPDATED_EVENT,
+  initialHeadRoNotifications,
+} from "@/lib/head-ro-notifications";
 
 export function NotificationList() {
-  const [notifications, setNotifications] = useState(initialNotifications);
+  const [notifications, setNotifications] = useState(initialHeadRoNotifications);
+
+  useEffect(() => {
+    const storedNotifications = window.localStorage.getItem(
+      HEAD_RO_NOTIFICATIONS_STORAGE_KEY
+    );
+    if (!storedNotifications) return;
+
+    try {
+      setNotifications(JSON.parse(storedNotifications));
+    } catch {
+      window.localStorage.removeItem(HEAD_RO_NOTIFICATIONS_STORAGE_KEY);
+    }
+  }, []);
 
   const unreadCount = notifications.filter((n) => n.unread).length;
 
   const markAllAsRead = () => {
-    setNotifications((prev) =>
-      prev.map((n) => ({ ...n, unread: false }))
+    const updatedNotifications = notifications.map((notification) => ({
+      ...notification,
+      unread: false,
+    }));
+    setNotifications(updatedNotifications);
+    window.localStorage.setItem(
+      HEAD_RO_NOTIFICATIONS_STORAGE_KEY,
+      JSON.stringify(updatedNotifications)
     );
+    window.dispatchEvent(new Event(HEAD_RO_NOTIFICATIONS_UPDATED_EVENT));
   };
 
   return (
