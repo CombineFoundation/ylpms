@@ -63,6 +63,8 @@ export interface Event {
   reviewComment?: string;
   evidence?: EventEvidence;
   certificatesIssuedAt?: Timestamp | Date;
+  /** Given the first time the activity issues certificates; the middle part of "YLP/007/001". */
+  certificateActivityNumber?: number;
   certificateCount?: number;
   createdAt: Timestamp | Date;
   updatedAt: Timestamp | Date;

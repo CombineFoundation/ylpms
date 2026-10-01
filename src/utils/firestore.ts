@@ -176,3 +176,29 @@ export async function getDocCount(collectionName: string, filters: Filter[] = []
   const snapshot = await query.count().get();
   return snapshot.data().count;
 }
+
+/**
+ * Gives a document a permanent sequence number: returns `field` if the doc
+ * already has one, otherwise atomically takes the next value of the counter
+ * `counters/{counterId}` and stores it on the doc. Safe under concurrent calls.
+ */
+export async function assignSequenceNumber(
+  counterId: string,
+  collectionName: string,
+  docId: string,
+  field: string
+): Promise<number> {
+  const db = getFirebaseAdminDb();
+  const counterRef = db.collection("counters").doc(counterId);
+  const docRef = db.collection(collectionName).doc(docId);
+  return db.runTransaction(async (transaction) => {
+    const [counterSnap, docSnap] = await Promise.all([transaction.get(counterRef), transaction.get(docRef)]);
+    const existing = docSnap.get(field);
+    if (typeof existing === "number") return existing;
+
+    const next = ((counterSnap.get("value") as number | undefined) ?? 0) + 1;
+    transaction.set(counterRef, { value: next, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+    transaction.update(docRef, { [field]: next, updatedAt: FieldValue.serverTimestamp() });
+    return next;
+  });
+}

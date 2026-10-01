@@ -1,4 +1,4 @@
-import { batchWrite, getDocById, getDocsByIds, queryDocs } from "@/utils/firestore";
+import { assignSequenceNumber, batchWrite, getDocById, getDocsByIds, queryDocs } from "@/utils/firestore";
 import { toDate } from "@/utils/aggregation";
 import { canAccessUserInChain } from "@/utils/authorization";
 import { AuthorizationError, NotFoundError, logger } from "@/utils/errors";
@@ -29,9 +29,21 @@ const titles: Record<CertificateKind, string> = {
 /** Deterministic id, so verifying twice can't issue duplicates. */
 const certificateId = (eventId: string, userId: string) => `${eventId}_${userId}`;
 
-function certificateNumber(issuedAt: Date) {
-  const suffix = crypto.randomUUID().replace(/-/g, "").slice(0, 8).toUpperCase();
-  return `YLP-${issuedAt.getFullYear()}-${suffix}`;
+const pad = (value: number) => String(value).padStart(3, "0");
+
+/**
+ * "YLP/{activity}/{position}", e.g. YLP/007/001: the activity's number (given
+ * once, the first time it issues certificates) and the certificate's position
+ * within it — the organizer (youth leader) is 001, participants follow.
+ */
+const certificateNumber = (activityNumber: number, position: number) => `YLP/${pad(activityNumber)}/${pad(position)}`;
+
+/** Organizers first (youth leaders before anyone else), then participants by name. */
+function issueOrder(kindByUser: Map<string, CertificateKind>) {
+  return (a: User, b: User) => {
+    const rank = (user: User) => (kindByUser.get(user.id) === "organizer" ? (user.role === "youth-leader" ? 0 : 1) : 2);
+    return rank(a) - rank(b) || a.name.localeCompare(b.name);
+  };
 }
 
 /**
@@ -48,36 +60,40 @@ export async function issueEventCertificates(event: Event, issuedById: string): 
   const userIds = [...kindByUser.keys()];
   const [recipients, existing, issuer] = await Promise.all([
     getDocsByIds<User>("users", userIds),
-    getDocsByIds<Certificate>(COLLECTION, userIds.map((id) => certificateId(event.id, id))),
+    queryDocs<Certificate>(COLLECTION, [{ field: "eventId", operator: "==", value: event.id }]),
     getDocById<User>("users", issuedById),
   ]);
   const alreadyIssued = new Set(existing.map((certificate) => certificate.userId));
+  const pending = recipients.filter((recipient) => !alreadyIssued.has(recipient.id)).sort(issueOrder(kindByUser));
+  if (pending.length === 0) return 0;
+
+  const activityNumber = await assignSequenceNumber("certificate-activities", "events", event.id, "certificateActivityNumber");
+  // Certificates added later (e.g. evidence re-verified with more participants) continue the activity's numbering.
+  const lastPosition = existing.reduce((max, certificate) => Math.max(max, certificate.position ?? 0), 0);
   const issuedAt = new Date();
 
-  const newCertificates = recipients
-    .filter((recipient) => !alreadyIssued.has(recipient.id))
-    .map((recipient) => {
-      const kind = kindByUser.get(recipient.id)!;
-      const certificate: Omit<Certificate, "id" | "createdAt" | "updatedAt"> = {
-        userId: recipient.id,
-        recipientName: recipient.name,
-        recipientRole: recipient.role,
-        kind,
-        title: titles[kind],
-        eventId: event.id,
-        eventTitle: event.title,
-        eventLocation: event.location,
-        eventDate: toDate(event.startDate) ?? issuedAt,
-        certificateNumber: certificateNumber(issuedAt),
-        issuedBy: issuedById,
-        issuedByName: issuer?.name || "Combine Foundation",
-        issuedAt,
-        status: "issued",
-      };
-      return certificate;
-    });
-
-  if (newCertificates.length === 0) return 0;
+  const newCertificates = pending.map((recipient, index) => {
+    const kind = kindByUser.get(recipient.id)!;
+    const certificate: Omit<Certificate, "id" | "createdAt" | "updatedAt"> = {
+      userId: recipient.id,
+      recipientName: recipient.name,
+      recipientRole: recipient.role,
+      kind,
+      title: titles[kind],
+      eventId: event.id,
+      eventTitle: event.title,
+      eventLocation: event.location,
+      eventDate: toDate(event.startDate) ?? issuedAt,
+      certificateNumber: certificateNumber(activityNumber, lastPosition + index + 1),
+      activityNumber,
+      position: lastPosition + index + 1,
+      issuedBy: issuedById,
+      issuedByName: issuer?.name || "Combine Foundation",
+      issuedAt,
+      status: "issued",
+    };
+    return certificate;
+  });
 
   await batchWrite(
     newCertificates.map((certificate) => ({
