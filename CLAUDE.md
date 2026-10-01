@@ -19,7 +19,7 @@ There is no test suite configured in this repo (no test script/framework in `pac
 
 ### Environment
 
-Client Firebase config (`NEXT_PUBLIC_FIREBASE_*`) goes in `.env.local` per `README.md`. Server-side secrets live in `.env`: `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY` (Admin SDK service account) and `SMTP_HOST`/`SMTP_PORT`/`SMTP_USER`/`SMTP_PASSWORD`/`SMTP_FROM`/`SMTP_TLS_REJECT_UNAUTHORIZED` (nodemailer, used for OTP emails and sending generated user credentials).
+Client Firebase config (`NEXT_PUBLIC_FIREBASE_*`) goes in `.env.local` per `README.md`. Server-side secrets live in `.env`: `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY` (Admin SDK service account) and `SMTP_HOST`/`SMTP_PORT`/`SMTP_USER`/`SMTP_PASSWORD`/`SMTP_FROM`/`SMTP_TLS_REJECT_UNAUTHORIZED` (nodemailer, used for emailing generated user credentials).
 
 Firebase project config for the CLI lives in `firebase.json` / `.firebaserc` / `firestore.rules` / `firestore.indexes.json` / `storage.rules` at the repo root.
 
@@ -101,9 +101,9 @@ The program runs in cohorts (`src/services/cohort.service.ts`, `cohorts` collect
 
 Events are called "Activities" in every portal (`/<portal>/activities`); the old `/…/events` pages only redirect. A youth leader's task can link to one of their open activities (`eventId`/`eventTitle` on the task, validated in `task.service.ts`).
 
-### OTP flow
+### Password reset
 
-`src/app/api/auth/send-otp` / `verify-otp` and `src/lib/otp-store.ts` implement an in-memory OTP store (email → code, 5 min TTL, 5 attempts). It's explicitly dev-only / single-instance (won't survive serverless cold starts or multiple instances) — the module header notes swapping in Redis/Upstash/Vercel KV or a DB table for production, keeping the same function signatures (`setOtp`, `verifyOtp`).
+"Forgot password" on the login page calls Firebase Auth's `sendPasswordResetEmail` directly (`src/components/ForgotPasswordModal.tsx`); there's no server-side OTP flow.
 
 ## Coding conventions (from Agents.md)
 
