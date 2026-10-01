@@ -1,22 +1,47 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --bg: #f9fafb;
+  --white: #ffffff;
+  --primary: #169AD7;
+  --primary-dark: #0f7bae;
+  --primary-tint: #e6f4fb;
+  --secondary: #FF6900;
+  --secondary-dark: #e05800;
+  --secondary-tint: #fff0e3;
+  --navy: #111827;
+  --gray: #5b6472;
+  --gray-light: #8a92a0;
+  --border: #e7eaee;
+  --radius: 18px;
+  --shadow: 0 8px 30px -12px rgba(17, 24, 39, 0.15);
+  --ff-display: 'Sora', sans-serif;
+  --ff-body: 'Inter', sans-serif;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-background: var(--bg);
+  --color-foreground: var(--navy);
+  --font-sans: var(--ff-body);
+  --font-mono: var(--ff-body);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* Portal brand tokens: use bg-brand, text-brand, hover:bg-brand-dark, bg-brand/10, bg-brand-navy … */
+@theme {
+  --color-brand: #E8622C;
+  --color-brand-dark: #D9551F;
+  --color-brand-navy: #1E3A6E;
+}
+
+/*
+ * The portal is designed light-only. --background/--foreground were previously
+ * undefined in light mode and flipped to white text under an OS dark theme,
+ * which made unstyled inputs render white-on-white.
+ */
+:root {
+  --background: var(--bg);
+  --foreground: var(--navy);
+  color-scheme: light;
 }
 
 body {

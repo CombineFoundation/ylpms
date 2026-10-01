@@ -2,7 +2,17 @@ import { Timestamp } from "firebase/firestore";
 
 export type ReportType = "monthly" | "quarterly" | "annual" | "task-completion" | "volunteer-hours" | "custom";
 
-export type ReportStatus = "draft" | "submitted" | "reviewed" | "approved";
+export type ReportStatus = "draft" | "submitted" | "reviewed" | "approved" | "rejected";
+
+/** A PDF stored in Firebase Storage; downloaded via GET /api/reports/[reportId]/attachments/[index]. */
+export interface ReportAttachment {
+  /** Storage object path, always under `reports/{submitterId}/`. */
+  path: string;
+  /** Original file name, for display and download. */
+  name: string;
+  /** Bytes. */
+  size: number;
+}
 
 export interface Report {
   id: string;
@@ -11,6 +21,7 @@ export interface Report {
   status: ReportStatus;
   submittedBy: string; // User ID
   reviewedBy?: string; // User ID
+  reviewComment?: string; // Reviewer's feedback, e.g. why it was rejected
   period: {
     startDate: Timestamp | Date;
     endDate: Timestamp | Date;
@@ -20,7 +31,7 @@ export interface Report {
     achievements: string[];
     challenges: string[];
     metrics: Record<string, number>;
-    attachments?: string[];
+    attachments?: ReportAttachment[];
   };
   createdAt: Timestamp | Date;
   updatedAt: Timestamp | Date;
@@ -40,6 +51,7 @@ export interface CreateReportRequest {
     achievements: string[];
     challenges: string[];
     metrics: Record<string, number>;
+    attachments?: ReportAttachment[];
   };
 }
 

@@ -1,8 +1,8 @@
-"use client";
+import type { Metadata } from "next";
+import { ActivityBoard } from "@/components/shared/activities/ActivityBoard";
 
-import React from "react";
-import { ActivityList } from "@/components/volunteer/activities/ActivityList";
+export const metadata: Metadata = { title: "Activities" };
 
-export default function ActivitiesPage() {
-  return <ActivityList />;
+export default function Page() {
+  return <ActivityBoard portal="volunteer" />;
 }

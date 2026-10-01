@@ -1,19 +1,92 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Eye, EyeOff, Mail, Lock } from "lucide-react";
 import ForgotPasswordModal from "./ForgotPasswordModal";
+import { signInWithEmailAndPassword, signOut } from "firebase/auth";
+import { getFirebaseAuth } from "@/lib/firebase";
+import type { UserRole } from "@/types/user.types";
+import type { PublicStats } from "@/types/public-stats.types";
+import { formatCount, formatReach } from "@/utils/impact-format";
 
-export default function LoginContent() {
+/** An error whose message is safe and meant to be shown to the user as-is. */
+class LoginError extends Error {}
+
+export default function LoginContent({ stats }: { stats: PublicStats }) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const reason = searchParams.get("reason");
+  const sessionExpired = reason === "expired";
+  const accountDisabled = reason === "disabled";
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isForgotOpen, setIsForgotOpen] = useState(false);
+  const [isSigningIn, setIsSigningIn] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Wire up your auth logic here
-    console.log({ email, password });
+    setError(null);
+    setIsSigningIn(true);
+
+    try {
+      const credential = await signInWithEmailAndPassword(
+        getFirebaseAuth(),
+        email.trim(),
+        password
+      );
+      const token = await credential.user.getIdToken();
+      localStorage.setItem("token", token);
+
+      // The server checks the account's status (blocking inactive/suspended
+      // users), records the login, and returns the authoritative role.
+      const sessionResponse = await fetch("/api/auth/session", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const sessionResult = await sessionResponse.json().catch(() => ({}));
+      if (!sessionResponse.ok) {
+        await signOut(getFirebaseAuth()).catch(() => undefined);
+        localStorage.removeItem("token");
+        throw new LoginError(
+          sessionResult.error?.message || "Unable to start your session. Please try again."
+        );
+      }
+
+      const role = sessionResult.data?.role as UserRole | undefined;
+      const routes = {
+        developer: "/Head-of-RO/dashboard",
+        "head-ro": "/Head-of-RO/dashboard",
+        sro: "/SRO/dashboard",
+        ro: "/RO/dashboard",
+        "youth-leader": "/youth-leader/dashboard",
+        volunteer: "/volunteer/dashboard",
+      } as const;
+
+      if (!role || !(role in routes)) {
+        throw new LoginError("Login succeeded, but no role was found in this user's profile.");
+      }
+
+      document.cookie = `role=${role}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Lax`;
+
+      router.replace(routes[role]);
+    } catch (loginError) {
+      console.error("Login failed:", loginError);
+      const code = (loginError as { code?: string } | null)?.code;
+      setError(
+        loginError instanceof LoginError
+          ? loginError.message
+          : code === "auth/user-disabled"
+          ? "This account has been deactivated. Contact your administrator."
+          : code === "auth/too-many-requests"
+          ? "Too many attempts. Please wait a moment and try again."
+          : "Invalid email or password. Please try again."
+      );
+    } finally {
+      setIsSigningIn(false);
+    }
   };
 
   return (
@@ -47,14 +120,14 @@ export default function LoginContent() {
             </svg>
           </span>
           <span className="text-white text-sm font-semibold tracking-wide">
-            Youth Leaders Program
+            Youth Leadership Program
           </span>
         </div>
 
         {/* Hero copy */}
         <div className="relative z-10 flex-1 flex flex-col justify-center px-8 sm:px-12 max-w-xl">
           <span className="inline-block w-fit rounded-full bg-white/15 px-3 py-1 text-[11px] font-semibold tracking-wide text-white mb-5">
-            JOIN YLP 2.0
+            JOIN {stats.current.name.toUpperCase()}
           </span>
 
           <h1 className="text-white font-bold leading-tight text-3xl sm:text-4xl lg:text-[2.6rem] mb-4">
@@ -80,15 +153,15 @@ export default function LoginContent() {
           <div className="grid grid-cols-3 gap-4 divide-x divide-white/10">
             <div>
               <p className="text-[#E8622C] font-bold text-xl sm:text-2xl">
-                100+
+                {formatCount(stats.total.webinars + stats.total.onsiteWorkshops)}
               </p>
               <p className="text-white/60 text-[11px] sm:text-xs mt-1">
-                Workshops
+                Workshops &amp; Webinars
               </p>
             </div>
             <div className="pl-4">
               <p className="text-[#E8622C] font-bold text-xl sm:text-2xl">
-                10,000+
+                {formatCount(stats.total.directBeneficiaries)}
               </p>
               <p className="text-white/60 text-[11px] sm:text-xs mt-1">
                 Direct Beneficiaries
@@ -96,7 +169,7 @@ export default function LoginContent() {
             </div>
             <div className="pl-4">
               <p className="text-[#E8622C] font-bold text-xl sm:text-2xl">
-                5M+
+                {formatReach(stats.total.digitalReach)}
               </p>
               <p className="text-white/60 text-[11px] sm:text-xs mt-1">
                 Digital Reach
@@ -115,6 +188,18 @@ export default function LoginContent() {
           <p className="text-sm text-gray-500 mb-8">
             Enter your credentials to access your youth portal
           </p>
+
+          {sessionExpired && !error && (
+            <p className="mb-5 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-700">
+              Your session expired. Please sign in again.
+            </p>
+          )}
+
+          {accountDisabled && !error && (
+            <p className="mb-5 rounded-md bg-red-50 px-3 py-2 text-sm text-red-600">
+              Your account has been deactivated or suspended. Contact your administrator.
+            </p>
+          )}
 
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
@@ -182,11 +267,14 @@ export default function LoginContent() {
               </div>
             </div>
 
+            {error && <p className="text-sm text-red-500">{error}</p>}
+
             <button
               type="submit"
+              disabled={isSigningIn}
               className="w-full rounded-full bg-[#E8622C] py-3 text-sm font-semibold text-white hover:bg-[#d9551f] transition-colors focus:outline-none focus:ring-2 focus:ring-[#E8622C]/50 focus:ring-offset-2"
             >
-              Sign In
+              {isSigningIn ? "Signing in..." : "Sign In"}
             </button>
           </form>
         </div>

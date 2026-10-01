@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { extractToken, verifyToken } from "@/utils/auth";
-import { AuthenticationError, AuthorizationError, handleError } from "@/utils/errors";
-import { UserRole } from "@/types/user.types";
+import { getFirebaseAdminAuth, getFirebaseAdminDb } from "@/lib/firebase-admin";
+import {
+  AccountDisabledError,
+  AuthenticationError,
+  AuthorizationError,
+  handleError,
+} from "@/utils/errors";
+import { UserRole, UserStatus } from "@/types/user.types";
+import { cohortAccessError } from "@/services/cohort.service";
 
 export interface AuthenticatedRequest extends NextRequest {
   user?: {
@@ -19,24 +25,83 @@ export function withAuth(
 ) {
   return async (req: NextRequest): Promise<NextResponse> => {
     try {
-      const token = extractToken(req.headers.get("authorization") || "");
-      const decoded = verifyToken(token);
+      const authorization = req.headers.get("authorization") || "";
+      const [scheme, token] = authorization.split(" ");
+      if (scheme?.toLowerCase() !== "bearer" || !token) {
+        throw new AuthenticationError("Missing or invalid authorization header");
+      }
+
+      const decoded = await getFirebaseAdminAuth().verifyIdToken(token);
+      const profileSnapshot = await getFirebaseAdminDb()
+        .collection("users")
+        .doc(decoded.uid)
+        .get();
+      const profile = profileSnapshot.data() as { role?: UserRole; status?: UserStatus; cohortId?: string } | undefined;
+      // The Firestore profile is the source of truth; custom claims can be stale
+      // after a role change until the user's token refreshes.
+      const role = profile?.role || decoded.role;
+
+      if (!role) {
+        throw new AuthenticationError("User profile is missing a role");
+      }
+
+      if (profile?.status && BLOCKED_STATUSES.has(profile.status)) {
+        // 403, not 401: the token is valid, the account just isn't allowed in.
+        throw new AccountDisabledError(
+          profile.status === "suspended"
+            ? "Your account has been suspended. Contact your administrator."
+            : "Your account has been deactivated. Contact your administrator."
+        );
+      }
+
+      // Youth leaders and volunteers can only sign in while their cohort runs.
+      const cohortError = await cohortAccessError(role, profile?.cohortId);
+      if (cohortError) throw new AccountDisabledError(cohortError);
 
       // Attach user info to request
       const authReq = req as AuthenticatedRequest;
       authReq.user = {
-        userId: decoded.userId,
-        email: decoded.email,
-        role: decoded.role,
+        userId: decoded.uid,
+        email: decoded.email || "",
+        role,
       };
-
-      return handler(authReq);
     } catch (error) {
-      return NextResponse.json(handleError(error), {
-        status: error instanceof AuthenticationError ? 401 : 500,
-      });
+      const normalizedError = normalizeAuthError(error);
+      const response = handleError(normalizedError);
+      return NextResponse.json(response, { status: response.error.statusCode || 500 });
+    }
+
+    // Awaited outside the auth try/catch so handler errors are reported with
+    // their own status instead of being mistaken for auth failures.
+    try {
+      return await handler(req as AuthenticatedRequest);
+    } catch (error) {
+      const response = handleError(error);
+      return NextResponse.json(response, { status: response.error.statusCode || 500 });
     }
   };
+}
+
+const BLOCKED_STATUSES = new Set<UserStatus>(["inactive", "suspended"]);
+
+/**
+ * The Firebase Admin SDK throws its own error classes (not our AuthenticationError)
+ * for an expired/revoked/invalid ID token — e.g. `verifyIdToken()` rejecting with
+ * code "auth/id-token-expired". Left alone, that error is neither recognized here
+ * as an auth failure (so it 500s instead of 401s) nor caught by the client's
+ * expired-session handling (which watches for 401), and its raw message — meant
+ * for server logs — leaks straight to the browser. Normalize any Firebase Auth
+ * SDK error into our AuthenticationError so both behave correctly.
+ */
+function normalizeAuthError(error: unknown): unknown {
+  if (error instanceof AuthenticationError) return error;
+
+  const code = (error as { code?: unknown } | null)?.code;
+  if (typeof code === "string" && code.startsWith("auth/")) {
+    return new AuthenticationError("Your session has expired. Please sign in again.");
+  }
+
+  return error;
 }
 
 /**
@@ -54,6 +119,7 @@ export function withRole(
 
       const roles = Array.isArray(requiredRoles) ? requiredRoles : [requiredRoles];
       const roleHierarchy: Record<UserRole, number> = {
+        developer: 6,
         "head-ro": 5,
         "sro": 4,
         "ro": 3,
@@ -70,12 +136,10 @@ export function withRole(
         );
       }
 
-      return handler(req);
+      return await handler(req);
     } catch (error) {
       const response = handleError(error);
-      return NextResponse.json(response, {
-        status: error instanceof AuthorizationError ? 403 : 401,
-      });
+      return NextResponse.json(response, { status: response.error.statusCode || 500 });
     }
   });
 }
@@ -84,7 +148,7 @@ export function withRole(
  * Wrapper for handling errors in API routes
  */
 export async function handleApiRoute<T>(
-  handler: (req: NextRequest) => Promise<{ success: true; data: T } | { success: false; error: any }>
+  handler: (req: NextRequest) => Promise<{ success: true; data: T } | { success: false; error: unknown }>
 ) {
   return async (req: NextRequest): Promise<NextResponse> => {
     try {

@@ -5,7 +5,6 @@ import {
   CreateActivityLogRequest,
 } from "@/types/activitylog.types";
 import { logger } from "@/utils/errors";
-import { Timestamp } from "firebase/firestore";
 
 /**
  * Activity Log Service - Track user actions for audit purposes

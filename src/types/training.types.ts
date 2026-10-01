@@ -104,3 +104,61 @@ export interface EnrollCourseRequest {
   courseId: string;
   userId: string;
 }
+
+// Training Portal resources (managed by Head RO; shown on Youth Leader / Volunteer training pages)
+export type TrainingResourceType = "video" | "pdf" | "ppt" | "assignment";
+
+export const TRAINING_CATEGORIES = [
+  "Leadership",
+  "Community Engagement",
+  "Volunteer Management",
+  "Communication",
+  "Delegation",
+  "Team Motivation",
+  "Program Planning",
+] as const;
+export type TrainingResourceCategory = (typeof TRAINING_CATEGORIES)[number];
+
+/** Roles a resource is published to. */
+export type TrainingAudience = "sro" | "ro" | "youth-leader" | "volunteer";
+
+export interface TrainingResource {
+  id: string;
+  title: string;
+  description: string;
+  type: TrainingResourceType;
+  category: TrainingResourceCategory;
+  /** Video embed/watch link, or a link to the PDF / PPT / assignment brief. Absent when a file was uploaded. */
+  url?: string;
+  /** An uploaded file (stored privately, streamed via GET /api/training/[resourceId]/file). */
+  file?: TrainingFile;
+  /** e.g. "45:20" for videos. */
+  duration?: string;
+  /** Page/slide count for documents. */
+  pages?: number;
+  audience: TrainingAudience[];
+  published: boolean;
+  authorId: string;
+  authorName: string;
+  createdAt: Timestamp | Date;
+  updatedAt: Timestamp | Date;
+}
+
+export interface TrainingFile {
+  path: string;
+  name: string;
+  size: number;
+  contentType: string;
+}
+
+export type CreateTrainingResourceRequest = Omit<
+  TrainingResource,
+  "id" | "authorId" | "authorName" | "createdAt" | "updatedAt"
+>;
+/** null clears a field (e.g. `url` when switching to an uploaded file, `file` when switching to a link). */
+export type UpdateTrainingResourceRequest = Partial<Omit<CreateTrainingResourceRequest, "duration" | "pages" | "url" | "file">> & {
+  duration?: string | null;
+  pages?: number | null;
+  url?: string | null;
+  file?: TrainingFile | null;
+};

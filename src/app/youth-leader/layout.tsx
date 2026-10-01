@@ -1,22 +1,21 @@
-"use client";
-
-import React from "react";
+import type { Metadata } from "next";
 import Sidebar from "@/components/Youth-Leader/Sidebar";
 import Topbar from "@/components/Youth-Leader/Topbar";
+import { PortalScopePicker } from "@/components/shared/PortalScopePicker";
 
-export default function YouthLeaderLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export const metadata: Metadata = {
+  title: { template: "%s | Youth Leader Portal", default: "Youth Leader Portal" },
+};
+
+/** Shared shell for every Youth Leader page: sidebar + topbar (+ developer picker) + content. */
+export default function YouthLeaderLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex min-h-screen w-full bg-gray-50">
+    <div className="flex min-h-screen w-full bg-slate-50 font-sans">
       <Sidebar />
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex min-w-0 flex-1 flex-col">
         <Topbar />
-        <main className="flex-1 overflow-y-auto p-6 lg:p-8">
-          {children}
-        </main>
+        <PortalScopePicker role="youth-leader" className="border-b px-6 py-2.5 lg:px-8" />
+        <main className="flex flex-1 flex-col p-6 lg:p-8">{children}</main>
       </div>
     </div>
   );

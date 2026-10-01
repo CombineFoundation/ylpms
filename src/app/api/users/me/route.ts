@@ -1,38 +1,20 @@
-import { NextRequest, NextResponse } from "next/server";
 import { withAuth } from "@/middleware/auth.middleware";
 import { getUserById } from "@/services/user.service";
-import { handleError } from "@/utils/errors";
+import { AuthenticationError, NotFoundError } from "@/utils/errors";
+import { apiError, apiSuccess } from "@/utils/api-response";
 
 /**
  * GET /api/users/me - Get current user
  */
 export const GET = withAuth(async (req) => {
   try {
-    if (!req.user) {
-      return NextResponse.json(handleError(new Error("Unauthorized")), {
-        status: 401,
-      });
-    }
+    if (!req.user) throw new AuthenticationError();
 
     const user = await getUserById(req.user.userId);
+    if (!user) throw new NotFoundError("User not found");
 
-    if (!user) {
-      return NextResponse.json(
-        handleError(new Error("User not found")),
-        { status: 404 }
-      );
-    }
-
-    return NextResponse.json(
-      {
-        success: true,
-        data: user,
-      },
-      { status: 200 }
-    );
+    return apiSuccess(user);
   } catch (error) {
-    return NextResponse.json(handleError(error), {
-      status: (error as any).statusCode || 500,
-    });
+    return apiError(error);
   }
 });

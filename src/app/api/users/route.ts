@@ -1,53 +1,56 @@
-import { NextRequest, NextResponse } from "next/server";
 import { withAuth } from "@/middleware/auth.middleware";
-import { getUsers, createUser } from "@/services/user.service";
+import { getUsers, createUser, enrichUsersForList } from "@/services/user.service";
 import { requireRole } from "@/utils/auth";
-import { handleError, ValidationError } from "@/utils/errors";
+import { requireCanCreateRole } from "@/utils/authorization";
+import { AuthenticationError, AuthorizationError, ValidationError } from "@/utils/errors";
 import { createUserSchema } from "@/utils/validation";
+import { apiError, apiSuccess, parsePagination } from "@/utils/api-response";
+import type { UserRole, UserStatus } from "@/types/user.types";
+
+const ROLES: UserRole[] = ["developer", "head-ro", "sro", "ro", "youth-leader", "volunteer"];
+const STATUSES: UserStatus[] = ["active", "inactive", "suspended", "pending"];
 
 /**
- * GET /api/users - Get all users with optional filters
- * GET /api/users?role=ro&status=active&pageSize=10&pageNumber=1
+ * GET /api/users - One page of users, with manager name + direct-report count
+ * GET /api/users?role=ro&status=active&reportingToId=abc&unassigned=true&pageSize=25&pageNumber=1
  */
 export const GET = withAuth(async (req) => {
   try {
-    if (!req.user) {
-      return NextResponse.json(handleError(new Error("Unauthorized")), {
-        status: 401,
-      });
-    }
+    if (!req.user) throw new AuthenticationError();
 
     // Only allow ro and above to see other users
     requireRole(req.user.role, ["ro", "sro", "head-ro"]);
 
-    // Parse query parameters
     const { searchParams } = new URL(req.url);
-    const role = searchParams.get("role");
-    const status = searchParams.get("status");
-    const reportingToId = searchParams.get("reportingToId");
-    const pageSize = searchParams.get("pageSize");
-    const pageNumber = searchParams.get("pageNumber");
+    const role = searchParams.get("role") as UserRole | null;
+    const status = searchParams.get("status") as UserStatus | null;
+    if (role && !ROLES.includes(role)) throw new ValidationError("Invalid role filter");
+    if (status && !STATUSES.includes(status)) throw new ValidationError("Invalid status filter");
 
-    // Get users with filters
-    const users = await getUsers({
-      role: (role as any) || undefined,
-      status: (status as any) || undefined,
-      reportingToId: reportingToId || undefined,
-      pageSize: pageSize ? parseInt(pageSize) : 50,
-      pageNumber: pageNumber ? parseInt(pageNumber) : 1,
+    // Non-org-wide roles can only ever list their own direct reports
+    const isOrgWide = req.user.role === "head-ro" || req.user.role === "developer";
+    let reportingToId = searchParams.get("reportingToId") || undefined;
+    const unassigned = isOrgWide && searchParams.get("unassigned") === "true";
+    if (!isOrgWide) {
+      if (reportingToId && reportingToId !== req.user.userId) {
+        throw new AuthorizationError();
+      }
+      reportingToId = req.user.userId;
+    }
+
+    const page = await getUsers({
+      role: role || undefined,
+      status: status || undefined,
+      reportingToId,
+      unassigned,
+      ...parsePagination(searchParams),
     });
 
-    return NextResponse.json(
-      {
-        success: true,
-        data: users,
-      },
-      { status: 200 }
-    );
+    const users = await enrichUsersForList(page.items);
+
+    return apiSuccess(users, 200, { page: page.page, pageSize: page.pageSize, hasMore: page.hasMore });
   } catch (error) {
-    return NextResponse.json(handleError(error), {
-      status: (error as any).statusCode || 500,
-    });
+    return apiError(error);
   }
 });
 
@@ -56,32 +59,20 @@ export const GET = withAuth(async (req) => {
  */
 export const POST = withAuth(async (req) => {
   try {
-    if (!req.user) {
-      return NextResponse.json(handleError(new Error("Unauthorized")), {
-        status: 401,
-      });
-    }
+    if (!req.user) throw new AuthenticationError();
 
-    // Only Head RO can create users
+    // Only Head RO (and developer) can create users
     requireRole(req.user.role, "head-ro");
 
-    const body = await req.json();
+    const validatedData = createUserSchema.parse(await req.json());
 
-    // Validate input
-    const validatedData = createUserSchema.parse(body);
+    // A Head RO can't mint developer or other Head RO accounts.
+    requireCanCreateRole(req.user.role, validatedData.role);
 
     const user = await createUser(validatedData, req.user.userId);
 
-    return NextResponse.json(
-      {
-        success: true,
-        data: user,
-      },
-      { status: 201 }
-    );
+    return apiSuccess(user, 201);
   } catch (error) {
-    return NextResponse.json(handleError(error), {
-      status: (error as any).statusCode || 500,
-    });
+    return apiError(error);
   }
 });

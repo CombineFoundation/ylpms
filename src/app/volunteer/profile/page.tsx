@@ -1,8 +1,8 @@
-"use client";
+import type { Metadata } from "next";
+import { SettingsForm } from "@/components/Head-of-RO/SettingsForm";
 
-import React from "react";
-import { ProfileContent } from "@/components/volunteer/profile/ProfileContent";
+export const metadata: Metadata = { title: "Profile" };
 
-export default function ProfilePage() {
-  return <ProfileContent />;
+export default function Page() {
+  return <SettingsForm />;
 }

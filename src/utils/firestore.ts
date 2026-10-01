@@ -1,115 +1,58 @@
-import {
-  collection,
-  doc,
-  getDoc,
-  getDocs,
-  setDoc,
-  updateDoc as firebaseUpdateDoc,
-  deleteDoc,
-  query,
-  where,
-  orderBy,
-  limit,
-  offset,
-  Query,
-  DocumentData,
-  CollectionReference,
-  getFirestore,
-  Timestamp,
-  writeBatch,
-  WriteBatch,
-} from "firebase/firestore";
-import { NotFoundError, logger } from "@/utils/errors";
+import type { DocumentData } from "firebase-admin/firestore";
+import { FieldValue } from "firebase-admin/firestore";
+import { getFirebaseAdminDb } from "@/lib/firebase-admin";
+import { logger } from "@/utils/errors";
 
-/**
- * Get a single document by ID
- */
-export async function getDocById<T extends DocumentData>(
-  collectionName: string,
-  docId: string
-): Promise<T | null> {
-  try {
-    const db = getFirestore();
-    const docRef = doc(db, collectionName, docId);
-    const snapshot = await getDoc(docRef);
+export type Filter = {
+  field: string;
+  operator: "==" | "<" | "<=" | ">" | ">=" | "!=" | "in" | "not-in" | "array-contains";
+  value: unknown;
+};
 
-    if (!snapshot.exists()) {
-      return null;
-    }
+export type Page<T> = { items: T[]; page: number; pageSize: number; hasMore: boolean };
 
-    return { id: snapshot.id, ...snapshot.data() } as T;
-  } catch (error) {
-    logger.error(`Error fetching document from ${collectionName}`, error);
-    throw error;
-  }
+function withId<T>(id: string, data: DocumentData): T {
+  return { id, ...data } as T;
 }
 
-/**
- * Get multiple documents by IDs
- */
-export async function getDocsByIds<T extends DocumentData>(
-  collectionName: string,
-  docIds: string[]
-): Promise<T[]> {
-  try {
-    const db = getFirestore();
-    const docs: T[] = [];
-
-    for (const docId of docIds) {
-      const docRef = doc(db, collectionName, docId);
-      const snapshot = await getDoc(docRef);
-      if (snapshot.exists()) {
-        docs.push({ id: snapshot.id, ...snapshot.data() } as T);
-      }
-    }
-
-    return docs;
-  } catch (error) {
-    logger.error(`Error fetching documents from ${collectionName}`, error);
-    throw error;
-  }
+function removeUndefined<T extends DocumentData>(data: T): T {
+  return Object.fromEntries(
+    Object.entries(data).filter(([, value]) => value !== undefined)
+  ) as T;
 }
 
-/**
- * Query documents with filters
- */
+function applyFilters(query: FirebaseFirestore.Query, filters: Filter[]) {
+  return filters.reduce(
+    (current, filter) => current.where(filter.field, filter.operator, filter.value),
+    query
+  );
+}
+
+export async function getDocById<T extends DocumentData>(collectionName: string, docId: string): Promise<T | null> {
+  const snapshot = await getFirebaseAdminDb().collection(collectionName).doc(docId).get();
+  return snapshot.exists ? withId<T>(snapshot.id, snapshot.data() || {}) : null;
+}
+
+export async function getDocsByIds<T extends DocumentData>(collectionName: string, docIds: string[]): Promise<T[]> {
+  const documents = await Promise.all(docIds.map((docId) => getDocById<T>(collectionName, docId)));
+  return documents.filter(Boolean) as T[];
+}
+
 export async function queryDocs<T extends DocumentData>(
   collectionName: string,
-  filters: Array<{ field: string; operator: "==" | "<" | "<=" | ">" | ">=" | "!="; value: any }> = [],
+  filters: Filter[] = [],
   orderByField?: { field: string; direction: "asc" | "desc" },
   pagination?: { pageSize: number; pageNumber: number }
 ): Promise<T[]> {
   try {
-    const db = getFirestore();
-    const queryConstraints: any[] = [];
-
-    // Add filters
-    filters.forEach(({ field, operator, value }) => {
-      queryConstraints.push(where(field, operator as any, value));
-    });
-
-    // Add ordering
-    if (orderByField) {
-      queryConstraints.push(
-        orderBy(orderByField.field, orderByField.direction || "asc")
-      );
-    }
-
-    // Add pagination
+    let query = applyFilters(getFirebaseAdminDb().collection(collectionName), filters);
+    if (orderByField) query = query.orderBy(orderByField.field, orderByField.direction);
     if (pagination) {
-      const { pageSize, pageNumber } = pagination;
-      queryConstraints.push(limit(pageSize));
-      if (pageNumber > 1) {
-        queryConstraints.push(offset((pageNumber - 1) * pageSize));
-      }
+      const pageNumber = Math.max(1, pagination.pageNumber || 1);
+      query = query.offset((pageNumber - 1) * pagination.pageSize).limit(pagination.pageSize);
     }
-
-    const q = query(collection(db, collectionName), ...queryConstraints);
-    const snapshot = await getDocs(q);
-
-    return snapshot.docs.map(
-      (doc) => ({ id: doc.id, ...doc.data() } as T)
-    );
+    const snapshot = await query.get();
+    return snapshot.docs.map((document) => withId<T>(document.id, document.data()));
   } catch (error) {
     logger.error(`Error querying ${collectionName}`, error);
     throw error;
@@ -117,174 +60,119 @@ export async function queryDocs<T extends DocumentData>(
 }
 
 /**
- * Get all documents from a collection
+ * Like queryDocs, but returns one page plus whether another page exists
+ * (fetches one extra row to find out, so no separate count query is needed).
  */
-export async function getAllDocs<T extends DocumentData>(
-  collectionName: string
+export async function queryPage<T extends DocumentData>(
+  collectionName: string,
+  filters: Filter[],
+  orderByField: { field: string; direction: "asc" | "desc" } | undefined,
+  pagination: { pageSize: number; pageNumber: number }
+): Promise<Page<T>> {
+  const page = Math.max(1, pagination.pageNumber || 1);
+
+  try {
+    let query = applyFilters(getFirebaseAdminDb().collection(collectionName), filters);
+    if (orderByField) query = query.orderBy(orderByField.field, orderByField.direction);
+    query = query.offset((page - 1) * pagination.pageSize).limit(pagination.pageSize + 1);
+    const snapshot = await query.get();
+    const docs = snapshot.docs.map((document) => withId<T>(document.id, document.data()));
+    return {
+      items: docs.slice(0, pagination.pageSize),
+      page,
+      pageSize: pagination.pageSize,
+      hasMore: docs.length > pagination.pageSize,
+    };
+  } catch (error) {
+    logger.error(`Error querying page of ${collectionName}`, error);
+    throw error;
+  }
+}
+
+/**
+ * Fetches only the named fields of matching docs (a Firestore projection), for
+ * aggregations like "count by region" that don't need whole documents.
+ */
+export async function selectFields<T extends DocumentData>(
+  collectionName: string,
+  filters: Filter[],
+  fields: string[]
 ): Promise<T[]> {
-  try {
-    const db = getFirestore();
-    const snapshot = await getDocs(collection(db, collectionName));
-    return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as T));
-  } catch (error) {
-    logger.error(`Error fetching all documents from ${collectionName}`, error);
-    throw error;
-  }
+  const query = applyFilters(getFirebaseAdminDb().collection(collectionName), filters).select(...fields);
+  const snapshot = await query.get();
+  return snapshot.docs.map((document) => document.data() as T);
 }
 
-/**
- * Create a new document
- */
-export async function createDoc<T extends DocumentData>(
+/** Same as selectFields, but keeps each doc's id alongside the projected fields. */
+export async function selectFieldsWithIds<T extends DocumentData>(
   collectionName: string,
-  docId: string,
-  data: T
-): Promise<T> {
-  try {
-    const db = getFirestore();
-    const docRef = doc(db, collectionName, docId);
+  filters: Filter[],
+  fields: string[]
+): Promise<(T & { id: string })[]> {
+  const query = applyFilters(getFirebaseAdminDb().collection(collectionName), filters).select(...fields);
+  const snapshot = await query.get();
+  return snapshot.docs.map((document) => withId<T & { id: string }>(document.id, document.data()));
+}
 
-    const docData = {
-      ...data,
-      createdAt: Timestamp.now(),
-      updatedAt: Timestamp.now(),
-    };
+export async function getAllDocs<T extends DocumentData>(collectionName: string): Promise<T[]> {
+  const snapshot = await getFirebaseAdminDb().collection(collectionName).get();
+  return snapshot.docs.map((document) => withId<T>(document.id, document.data()));
+}
 
-    await setDoc(docRef, docData);
-    logger.info(`Document created in ${collectionName}/${docId}`);
-
-    return { id: docId, ...docData } as T;
-  } catch (error) {
-    logger.error(`Error creating document in ${collectionName}`, error);
-    throw error;
-  }
+export async function createDoc<T extends DocumentData>(collectionName: string, docId: string, data: T): Promise<T> {
+  const now = FieldValue.serverTimestamp();
+  const docData = {
+    ...removeUndefined(data),
+    createdAt: now,
+    updatedAt: now,
+  };
+  await getFirebaseAdminDb().collection(collectionName).doc(docId).set(docData);
+  return { id: docId, ...docData } as T;
 }
 
 /**
- * Update a document
+ * Partial update. `undefined` fields are skipped (Firestore rejects them), and
+ * `null` removes the field — e.g. clearing an optional limit.
  */
-export async function updateDoc<T extends DocumentData>(
-  collectionName: string,
-  docId: string,
-  data: Partial<T>
-): Promise<void> {
-  try {
-    const db = getFirestore();
-    const docRef = doc(db, collectionName, docId);
-
-    const updateData = {
-      ...data,
-      updatedAt: Timestamp.now(),
-    };
-
-    await firebaseUpdateDoc(docRef, updateData as any);
-    logger.info(`Document updated: ${collectionName}/${docId}`);
-  } catch (error) {
-    logger.error(`Error updating document in ${collectionName}`, error);
-    throw error;
-  }
+export async function updateDoc<T extends DocumentData>(collectionName: string, docId: string, data: Partial<T>): Promise<void> {
+  const changes = Object.fromEntries(
+    Object.entries(removeUndefined(data as DocumentData)).map(([key, value]) => [
+      key,
+      value === null ? FieldValue.delete() : value,
+    ])
+  );
+  await getFirebaseAdminDb().collection(collectionName).doc(docId).update({
+    ...changes,
+    updatedAt: FieldValue.serverTimestamp(),
+  });
 }
 
-/**
- * Delete a document
- */
-export async function deleteDocFromFirestore(
-  collectionName: string,
-  docId: string
-): Promise<void> {
-  try {
-    const db = getFirestore();
-    const docRef = doc(db, collectionName, docId);
-    await deleteDoc(docRef);
-    logger.info(`Document deleted: ${collectionName}/${docId}`);
-  } catch (error) {
-    logger.error(`Error deleting document from ${collectionName}`, error);
-    throw error;
-  }
+export async function deleteDocFromFirestore(collectionName: string, docId: string): Promise<void> {
+  await getFirebaseAdminDb().collection(collectionName).doc(docId).delete();
 }
 
-/**
- * Batch write operations
- */
-export async function batchWrite(
-  operations: Array<{
-    type: "set" | "update" | "delete";
-    collection: string;
-    docId: string;
-    data?: any;
-  }>
-): Promise<void> {
-  try {
-    const db = getFirestore();
-    const batch = writeBatch(db) as WriteBatch;
-
-    operations.forEach(({ type, collection: collName, docId, data }) => {
-      const docRef = doc(db, collName, docId);
-
-      if (type === "set") {
-        batch.set(docRef, {
-          ...data,
-          createdAt: Timestamp.now(),
-          updatedAt: Timestamp.now(),
-        });
-      } else if (type === "update") {
-        batch.update(docRef, {
-          ...data,
-          updatedAt: Timestamp.now(),
-        });
-      } else if (type === "delete") {
-        batch.delete(docRef);
-      }
+export async function batchWrite(operations: Array<{ type: "set" | "update" | "delete"; collection: string; docId: string; data?: DocumentData }>): Promise<void> {
+  const db = getFirebaseAdminDb();
+  const BATCH_LIMIT = 500; // Firestore's max writes per batch
+  for (let start = 0; start < operations.length; start += BATCH_LIMIT) {
+    const batch = db.batch();
+    operations.slice(start, start + BATCH_LIMIT).forEach(({ type, collection, docId, data }) => {
+      const reference = db.collection(collection).doc(docId);
+      if (type === "set") batch.set(reference, { ...data, createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() });
+      if (type === "update") batch.update(reference, { ...data, updatedAt: FieldValue.serverTimestamp() });
+      if (type === "delete") batch.delete(reference);
     });
-
     await batch.commit();
-    logger.info(`Batch write completed with ${operations.length} operations`);
-  } catch (error) {
-    logger.error("Error in batch write", error);
-    throw error;
   }
 }
 
-/**
- * Check if document exists
- */
-export async function docExists(
-  collectionName: string,
-  docId: string
-): Promise<boolean> {
-  try {
-    const db = getFirestore();
-    const docRef = doc(db, collectionName, docId);
-    const snapshot = await getDoc(docRef);
-    return snapshot.exists();
-  } catch (error) {
-    logger.error(`Error checking document existence in ${collectionName}`, error);
-    return false;
-  }
+export async function docExists(collectionName: string, docId: string): Promise<boolean> {
+  const snapshot = await getFirebaseAdminDb().collection(collectionName).doc(docId).get();
+  return snapshot.exists;
 }
 
-/**
- * Get document count
- */
-export async function getDocCount(
-  collectionName: string,
-  filters?: Array<{ field: string; operator: "==" | "<" | "<=" | ">" | ">=" | "!="; value: any }>
-): Promise<number> {
-  try {
-    const db = getFirestore();
-    const queryConstraints: any[] = [];
-
-    if (filters) {
-      filters.forEach(({ field, operator, value }) => {
-        queryConstraints.push(where(field, operator as any, value));
-      });
-    }
-
-    const q = query(collection(db, collectionName), ...queryConstraints);
-    const snapshot = await getDocs(q);
-    return snapshot.size;
-  } catch (error) {
-    logger.error(`Error getting document count from ${collectionName}`, error);
-    throw error;
-  }
+export async function getDocCount(collectionName: string, filters: Filter[] = []): Promise<number> {
+  const query = applyFilters(getFirebaseAdminDb().collection(collectionName), filters);
+  const snapshot = await query.count().get();
+  return snapshot.data().count;
 }

@@ -1,8 +1,8 @@
-"use client";
+import type { Metadata } from "next";
+import { NotificationList } from "@/components/Head-of-RO/notifications/NotificationList";
 
-import React from "react";
-import { NotificationList } from "@/components/volunteer/notifications/NotificationList";
+export const metadata: Metadata = { title: "Notifications" };
 
-export default function NotificationsPage() {
-  return <NotificationList />;
+export default function Page() {
+  return <NotificationList portalPrefix="/volunteer/" />;
 }

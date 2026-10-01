@@ -1,8 +1,8 @@
-"use client";
+import type { Metadata } from "next";
+import { CertificateList } from "@/components/shared/certificates/CertificateList";
 
-import React from "react";
-import { CertificateList } from "@/components/Youth-Leader/certificates/CertificateList";
+export const metadata: Metadata = { title: "Certificates" };
 
-export default function CertificatesPage() {
-  return <CertificateList />;
+export default function Page() {
+  return <CertificateList portal="youth-leader" />;
 }

@@ -3,9 +3,13 @@ import {
   updateDoc,
   deleteDocFromFirestore,
   queryDocs,
+  queryPage,
   getDocById,
-  docExists,
+  getDocsByIds,
+  getDocCount,
   batchWrite,
+  type Filter,
+  type Page,
 } from "@/utils/firestore";
 import {
   User,
@@ -22,51 +26,134 @@ import {
   ValidationError,
   logger,
 } from "@/utils/errors";
-import { getAuth, createUserWithEmailAndPassword } from "firebase/auth";
-import { getFirestore, Timestamp } from "firebase/firestore";
+import { MANAGER_FIELD_FOR, MANAGER_ROLES_FOR } from "@/utils/authorization";
+import { normalizeMemberId } from "@/utils/member-id";
+import { COHORT_ROLES, getCurrentCohort } from "./cohort.service";
+import { OPEN_TASK_STATUSES } from "@/types/task.types";
 import { createActivityLog } from "./activitylog.service";
+import { getFirebaseAdminAuth } from "@/lib/firebase-admin";
+import { sendUserCredentialsEmail } from "@/lib/mailer";
+import { notifyUsers, getUserIdsByRoles, filterUsersByPreference } from "./notification.service";
 
 /**
  * User Service - Handles all user-related operations
  */
 
+/** Statuses that block sign-in; mirrored onto the Firebase Auth account's `disabled` flag. */
+const DISABLED_STATUSES = new Set<UserStatus>(["inactive", "suspended"]);
+
+const roleLabels: Record<UserRole, string> = {
+  developer: "Developer",
+  "head-ro": "Head RO",
+  sro: "SRO",
+  ro: "RO",
+  "youth-leader": "Youth Leader",
+  volunteer: "Volunteer",
+};
+
+type ReportingUser = User & { reportingToId?: string };
+
+/** A user plus the display data list screens need, resolved server-side. */
+export type UserListItem = ReportingUser & {
+  reportingToName?: string;
+  directReportCount?: number;
+};
+
+/**
+ * Throws unless `managerId` is an existing user whose role may manage `role`
+ * (e.g. an RO's manager must be an SRO).
+ */
+async function validateManager(role: UserRole, managerId: string): Promise<User> {
+  const allowed = MANAGER_ROLES_FOR[role];
+  if (!allowed) {
+    throw new ValidationError(`A ${roleLabels[role]} can't be assigned a manager`);
+  }
+
+  const manager = await getUserById(managerId);
+  if (!manager) {
+    throw new ValidationError("The selected manager no longer exists");
+  }
+  if (!allowed.includes(manager.role)) {
+    throw new ValidationError(
+      `A ${roleLabels[role]} must report to a ${allowed.map((r) => roleLabels[r]).join(" or ")}, not a ${roleLabels[manager.role]}`
+    );
+  }
+  return manager;
+}
+
 /**
  * Create a new user
  */
+/** Throws if another user already has this program ID. */
+export async function requireMemberIdAvailable(memberId: string, exceptUserId?: string): Promise<void> {
+  const taken = await queryDocs<User>("users", [{ field: "memberId", operator: "==", value: normalizeMemberId(memberId) }]);
+  if (taken.some((user) => user.id !== exceptUserId)) {
+    throw new ConflictError(`ID ${normalizeMemberId(memberId)} is already in use`);
+  }
+}
+
 export async function createUser(
   data: CreateUserRequest,
   createdByUserId: string
 ): Promise<User> {
   try {
+    const email = data.email.trim().toLowerCase();
+
     // Check if email already exists
     const existingUser = await queryDocs<User>("users", [
-      { field: "email", operator: "==", value: data.email.toLowerCase() },
+      { field: "email", operator: "==", value: email },
     ]);
 
     if (existingUser.length > 0) {
-      throw new ConflictError(`User with email ${data.email} already exists`);
+      throw new ConflictError(`A user with email ${email} already exists`);
     }
 
-    // Generate user ID
-    const userId = crypto.randomUUID();
+    if (data.parentId) {
+      await validateManager(data.role, data.parentId);
+    }
+    const memberId = data.memberId ? normalizeMemberId(data.memberId) : undefined;
+    if (memberId) await requireMemberIdAvailable(memberId);
+
+    const temporaryPassword = `${crypto.randomUUID().replace(/-/g, "").slice(0, 12)}A!`;
+    let authUser;
+    try {
+      authUser = await getFirebaseAdminAuth().createUser({
+        email,
+        password: temporaryPassword,
+        displayName: data.name,
+      });
+    } catch (error) {
+      if ((error as { code?: string }).code === "auth/email-already-exists") {
+        throw new ConflictError(`A sign-in account for ${email} already exists`);
+      }
+      throw error;
+    }
+    const userId = authUser.uid;
+    await getFirebaseAdminAuth().setCustomUserClaims(userId, { role: data.role });
 
     // Create user data based on role
     const baseUserData: Omit<BaseUser, "id"> = {
-      email: data.email.toLowerCase(),
+      email,
       name: data.name,
+      memberId,
+      university: data.university || undefined,
+      cohortId: COHORT_ROLES.includes(data.role) ? (await getCurrentCohort()).id : undefined,
+      region: data.region,
       role: data.role,
-      status: "pending", // Users start as pending until email verification
+      status: "pending", // Promoted to "active" on first sign-in (POST /api/auth/session)
       phone: data.phone,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
 
     // Add role-specific fields
-    let userData: any = baseUserData;
+    const userData: Record<string, unknown> = { ...baseUserData };
 
-    if (data.role === "sro" || data.role === "ro") {
-      userData.reportingToId = data.parentId || "";
+    if (data.role === "sro") {
+      userData.reportingToId = "";
       userData.assignedROIds = [];
+    } else if (data.role === "ro") {
+      userData.reportingToId = data.parentId || "";
       userData.assignedYouthLeaderIds = [];
       userData.assignedVolunteerIds = [];
     } else if (data.role === "youth-leader") {
@@ -78,7 +165,52 @@ export async function createUser(
     }
 
     // Create user document in Firestore
-    const user = await createDoc<User>("users", userId, userData);
+    let user: User;
+    try {
+      user = await createDoc<User>("users", userId, userData as unknown as User);
+      await sendUserCredentialsEmail(email, data.name, temporaryPassword, data.role);
+    } catch (error) {
+      await getFirebaseAdminAuth().deleteUser(userId).catch(() => undefined);
+      await deleteDocFromFirestore("users", userId).catch(() => undefined);
+      throw error;
+    }
+
+    // Reciprocally add this user to their manager's assigned-* array, so the
+    // manager immediately sees the new report without a separate assign step.
+    const managerField = MANAGER_FIELD_FOR[data.role];
+    if (data.parentId && managerField) {
+      try {
+        const manager = await getUserById(data.parentId);
+        const currentIds = ((manager as unknown as Record<string, string[] | undefined>)?.[managerField]) || [];
+        await updateDoc("users", data.parentId, {
+          [managerField]: [...new Set([...currentIds, userId])],
+        });
+      } catch (error) {
+        logger.error(`Failed to add ${userId} to manager ${data.parentId}'s ${managerField}`, error);
+      }
+    }
+
+    // Let Head ROs know a new RO/SRO joined the org, even if they didn't add it themselves.
+    if (data.role === "ro" || data.role === "sro") {
+      try {
+        const headRoIds = (await getUserIdsByRoles(["head-ro", "developer"])).filter(
+          (id) => id !== createdByUserId
+        );
+        const recipients = await filterUsersByPreference(headRoIds, "user-added");
+        await notifyUsers(recipients, {
+          type: "user-added",
+          title: data.parentId
+            ? `New ${roleLabels[data.role]} ${data.name} was added`
+            : `New ${roleLabels[data.role]} ${data.name} registered and awaiting assignment`,
+          message: email,
+          relatedId: userId,
+          relatedType: "user",
+          actionUrl: data.role === "ro" ? "/Head-of-RO/ro" : "/Head-of-RO/sro",
+        });
+      } catch (error) {
+        logger.error(`Failed to notify Head ROs of new ${data.role} ${userId}`, error);
+      }
+    }
 
     // Log activity
     await createActivityLog({
@@ -89,7 +221,7 @@ export async function createUser(
       entityId: userId,
     });
 
-    logger.info(`User created: ${userId} (${data.email})`);
+    logger.info(`User created: ${userId} (${email})`);
     return user;
   } catch (error) {
     logger.error("Error creating user", error);
@@ -102,6 +234,7 @@ export async function createUser(
  */
 export async function getUserById(userId: string): Promise<User | null> {
   try {
+    if (!userId) return null;
     const user = await getDocById<User>("users", userId);
     return user;
   } catch (error) {
@@ -127,47 +260,45 @@ export async function getUserByEmail(email: string): Promise<User | null> {
 }
 
 /**
- * Get all users with optional filters
+ * Get one page of users with optional filters. `unassigned` limits to users
+ * with no manager (reportingToId == "").
  */
-export async function getUsers(filters?: {
+export async function getUsers(filters: {
   role?: UserRole;
   status?: UserStatus;
   reportingToId?: string;
-  pageSize?: number;
-  pageNumber?: number;
-}): Promise<User[]> {
+  unassigned?: boolean;
+  pageSize: number;
+  pageNumber: number;
+}): Promise<Page<User>> {
   try {
-    const queryFilters = [];
+    const queryFilters: Filter[] = [];
 
-    if (filters?.role) {
-      queryFilters.push({ field: "role", operator: "==" as const, value: filters.role });
+    if (filters.role) {
+      queryFilters.push({ field: "role", operator: "==", value: filters.role });
+    }
+    if (filters.status) {
+      queryFilters.push({ field: "status", operator: "==", value: filters.status });
+    }
+    if (filters.unassigned) {
+      queryFilters.push({ field: "reportingToId", operator: "==", value: "" });
+    } else if (filters.reportingToId) {
+      queryFilters.push({ field: "reportingToId", operator: "==", value: filters.reportingToId });
     }
 
-    if (filters?.status) {
-      queryFilters.push({ field: "status", operator: "==" as const, value: filters.status });
-    }
-
-    if (filters?.reportingToId) {
-      queryFilters.push({
-        field: "reportingToId",
-        operator: "==" as const,
-        value: filters.reportingToId,
-      });
-    }
-
-    const users = await queryDocs<User>(
+    // Newest first where an index exists (none, or role only — see
+    // firestore.indexes.json). Other equality combinations page in document-id
+    // order, which is still stable, instead of requiring more composite indexes.
+    const canOrderByCreated = queryFilters.length === 0 || (queryFilters.length === 1 && !!filters.role);
+    return await queryPage<User>(
       "users",
       queryFilters,
-      { field: "createdAt", direction: "desc" },
-      filters?.pageSize
-        ? {
-            pageSize: filters.pageSize,
-            pageNumber: filters.pageNumber || 1,
-          }
-        : undefined
+      canOrderByCreated ? { field: "createdAt", direction: "desc" } : undefined,
+      {
+        pageSize: filters.pageSize,
+        pageNumber: filters.pageNumber,
+      }
     );
-
-    return users;
   } catch (error) {
     logger.error("Error fetching users", error);
     throw error;
@@ -175,17 +306,59 @@ export async function getUsers(filters?: {
 }
 
 /**
+ * Adds the manager's name and a live count of direct reports to each user, so
+ * list screens don't have to download every user just to resolve names.
+ */
+export async function enrichUsersForList(users: User[]): Promise<UserListItem[]> {
+  const managerIds = [
+    ...new Set(users.map((user) => (user as ReportingUser).reportingToId).filter(Boolean) as string[]),
+  ];
+  const [managers, counts] = await Promise.all([
+    getDocsByIds<User>("users", managerIds),
+    Promise.all(
+      users.map((user) =>
+        getDocCount("users", [{ field: "reportingToId", operator: "==", value: user.id }]).catch(() => 0)
+      )
+    ),
+  ]);
+  const managerNames = new Map(managers.map((manager) => [manager.id, manager.name]));
+
+  return users.map((user, index) => {
+    const reportingToId = (user as ReportingUser).reportingToId;
+    return {
+      ...user,
+      reportingToName: reportingToId ? managerNames.get(reportingToId) : undefined,
+      directReportCount: counts[index],
+    };
+  });
+}
+
+/**
  * Get users by role with reporting structure
  */
-export async function getUsersByRole(role: UserRole): Promise<User[]> {
+export async function getUsersByRole(role: UserRole, reportingToId?: string): Promise<User[]> {
   try {
-    const users = await queryDocs<User>("users", [
-      { field: "role", operator: "==", value: role },
-    ]);
-    return users;
+    const filters: Filter[] = [{ field: "role", operator: "==", value: role }];
+    if (reportingToId) {
+      filters.push({ field: "reportingToId", operator: "==", value: reportingToId });
+    }
+    return await queryDocs<User>("users", filters);
   } catch (error) {
     logger.error(`Error fetching users by role ${role}`, error);
     throw error;
+  }
+}
+
+/**
+ * Refuses to deactivate/suspend/delete the last active Head RO, which would
+ * leave nobody able to manage the organisation.
+ */
+async function assertNotLastHeadRO(user: User, action: string): Promise<void> {
+  if (user.role !== "head-ro") return;
+  const headRos = await queryDocs<User>("users", [{ field: "role", operator: "==", value: "head-ro" }]);
+  const othersActive = headRos.filter((other) => other.id !== user.id && !DISABLED_STATUSES.has(other.status));
+  if (othersActive.length === 0) {
+    throw new ValidationError(`You can't ${action} the only active Head RO. Add another Head RO first.`);
   }
 }
 
@@ -204,14 +377,44 @@ export async function updateUser(
       throw new NotFoundError(`User ${userId} not found`);
     }
 
+    if (data.memberId !== undefined) {
+      data = { ...data, memberId: normalizeMemberId(data.memberId) };
+      if (data.memberId !== user.memberId) await requireMemberIdAvailable(data.memberId!, userId);
+    }
+
+    const statusChanged = data.status !== undefined && data.status !== user.status;
+    const disabling = statusChanged && DISABLED_STATUSES.has(data.status!);
+    if (disabling) {
+      await assertNotLastHeadRO(user, "deactivate");
+    }
+
     // Update user
     await updateDoc("users", userId, data);
 
+    // Keep Firebase Auth in step with the stored status so a deactivated user
+    // can't simply sign back in, and their existing sessions end now.
+    if (statusChanged) {
+      try {
+        const auth = getFirebaseAdminAuth();
+        await auth.updateUser(userId, { disabled: disabling });
+        if (disabling) await auth.revokeRefreshTokens(userId);
+      } catch (error) {
+        logger.error(`Failed to sync Auth disabled flag for ${userId}`, error);
+      }
+    }
+
+    if (data.name && data.name !== user.name) {
+      await getFirebaseAdminAuth()
+        .updateUser(userId, { displayName: data.name })
+        .catch((error) => logger.warn(`Failed to update Auth displayName for ${userId}`, error));
+    }
+
     // Log activity
-    const changes: Record<string, { oldValue: any; newValue: any }> = {};
+    const changes: Record<string, { oldValue: unknown; newValue: unknown }> = {};
     Object.entries(data).forEach(([key, newValue]) => {
-      if ((user as any)[key] !== newValue) {
-        changes[key] = { oldValue: (user as any)[key], newValue };
+      const oldValue = (user as unknown as Record<string, unknown>)[key];
+      if (oldValue !== newValue) {
+        changes[key] = { oldValue, newValue };
       }
     });
 
@@ -235,8 +438,27 @@ export async function updateUser(
   }
 }
 
+/** What deleting a user would affect, so the UI can warn before it happens. */
+export async function getUserDeletionImpact(userId: string): Promise<{ directReports: number; openTasks: number }> {
+  const [directReports, openTasks] = await Promise.all([
+    getDocCount("users", [{ field: "reportingToId", operator: "==", value: userId }]),
+    getDocCount("tasks", [
+      { field: "assignedTo", operator: "==", value: userId },
+      { field: "status", operator: "in", value: OPEN_TASK_STATUSES },
+    ]),
+  ]);
+  return { directReports, openTasks };
+}
+
 /**
- * Delete user (archive)
+ * Delete user permanently
+ *
+ * Deleting a manager (SRO/RO/Youth Leader) would otherwise leave their
+ * direct reports pointing at a `reportingToId` that no longer exists, and
+ * leave the deleted user's own manager with a stale ID in its assigned-*
+ * array. Clear both sides so reports become "Unassigned" (visible and
+ * re-assignable again) instead of silently orphaned. Open tasks assigned to
+ * the user are cancelled rather than left pointing at a deleted assignee.
  */
 export async function deleteUser(
   userId: string,
@@ -248,23 +470,178 @@ export async function deleteUser(
       throw new NotFoundError(`User ${userId} not found`);
     }
 
-    // Archive instead of hard delete
-    await updateDoc("users", userId, {
-      status: "inactive",
-    });
+    await assertNotLastHeadRO(user, "delete");
+
+    const [directReports, openTasks] = await Promise.all([
+      getUsersReportingTo(userId),
+      queryDocs<{ id: string }>("tasks", [
+        { field: "assignedTo", operator: "==", value: userId },
+        { field: "status", operator: "in", value: OPEN_TASK_STATUSES },
+      ]),
+    ]);
+
+    // Unassign anyone who reported directly to this user.
+    const operations: Array<{
+      type: "update";
+      collection: string;
+      docId: string;
+      data: Record<string, unknown>;
+    }> = directReports.map((report) => ({
+      type: "update",
+      collection: "users",
+      docId: report.id,
+      data: { reportingToId: "" },
+    }));
+
+    openTasks.forEach((task) =>
+      operations.push({
+        type: "update",
+        collection: "tasks",
+        docId: task.id,
+        data: { status: "cancelled" },
+      })
+    );
+
+    // Remove this user from their own manager's assigned-* array.
+    const reportingToId = (user as ReportingUser).reportingToId;
+    const managerField = MANAGER_FIELD_FOR[user.role];
+    if (reportingToId && managerField) {
+      const manager = await getUserById(reportingToId);
+      if (manager) {
+        const currentIds = ((manager as unknown as Record<string, string[] | undefined>)[managerField]) || [];
+        operations.push({
+          type: "update",
+          collection: "users",
+          docId: reportingToId,
+          data: { [managerField]: currentIds.filter((id) => id !== userId) },
+        });
+      }
+    }
+
+    if (operations.length > 0) {
+      await batchWrite(operations);
+    }
+
+    await deleteDocFromFirestore("users", userId);
+    await getFirebaseAdminAuth()
+      .deleteUser(userId)
+      .catch((error) => logger.error(`Failed to delete Auth account for ${userId}`, error));
 
     // Log activity
     await createActivityLog({
       userId: deletedByUserId,
       action: "user-deleted",
-      description: `Deleted user ${user.name}`,
+      description: `Deleted user ${user.name} (${directReports.length} reports unassigned, ${openTasks.length} open tasks cancelled)`,
       entityType: "user",
       entityId: userId,
     });
 
-    logger.info(`User deleted (archived): ${userId}`);
+    logger.info(`User deleted permanently: ${userId}`);
   } catch (error) {
     logger.error(`Error deleting user ${userId}`, error);
+    throw error;
+  }
+}
+
+/**
+ * Move users under a new manager (or unassign them with `managerId = null`).
+ *
+ * Validates each role pairing (e.g. only ROs under an SRO), removes each user
+ * from their previous manager's assigned-* array and adds them to the new
+ * one, all in a single batch.
+ */
+export async function setUsersManager(
+  userIds: string[],
+  managerId: string | null,
+  updatedByUserId: string
+): Promise<void> {
+  try {
+    const uniqueIds = [...new Set(userIds)];
+    const users = await getDocsByIds<User>("users", uniqueIds);
+    if (users.length !== uniqueIds.length) {
+      throw new NotFoundError("One or more selected users no longer exist");
+    }
+
+    let manager: User | null = null;
+    if (managerId) {
+      if (uniqueIds.includes(managerId)) {
+        throw new ValidationError("A user can't report to themselves");
+      }
+      for (const user of users) {
+        manager = await validateManager(user.role, managerId);
+      }
+    } else {
+      const unassignable = users.find((user) => !MANAGER_FIELD_FOR[user.role]);
+      if (unassignable) {
+        throw new ValidationError(`A ${roleLabels[unassignable.role]} can't be unassigned`);
+      }
+    }
+
+    // Accumulate array edits per manager so multiple moves in one call don't
+    // overwrite each other's changes.
+    const managerArrays = new Map<string, Record<string, Set<string>>>();
+    const loadManagerArrays = async (id: string) => {
+      if (!managerArrays.has(id)) {
+        const record = (id === managerId && manager ? manager : await getUserById(id)) as unknown as
+          | Record<string, unknown>
+          | null;
+        const arrays: Record<string, Set<string>> = {};
+        (["assignedROIds", "assignedYouthLeaderIds", "assignedVolunteerIds"] as const).forEach((field) => {
+          if (record && Array.isArray(record[field])) arrays[field] = new Set(record[field] as string[]);
+        });
+        managerArrays.set(id, arrays);
+      }
+      return managerArrays.get(id)!;
+    };
+
+    const operations: Array<{ type: "update"; collection: string; docId: string; data: Record<string, unknown> }> = [];
+
+    for (const user of users) {
+      const field = MANAGER_FIELD_FOR[user.role]!;
+      const previousId = (user as ReportingUser).reportingToId;
+      if (previousId === (managerId || "")) continue;
+
+      if (previousId) {
+        const arrays = await loadManagerArrays(previousId);
+        arrays[field]?.delete(user.id);
+      }
+      if (managerId) {
+        const arrays = await loadManagerArrays(managerId);
+        (arrays[field] ||= new Set()).add(user.id);
+      }
+
+      operations.push({
+        type: "update",
+        collection: "users",
+        docId: user.id,
+        data: { reportingToId: managerId || "" },
+      });
+    }
+
+    managerArrays.forEach((arrays, id) => {
+      const data = Object.fromEntries(Object.entries(arrays).map(([field, ids]) => [field, [...ids]]));
+      if (Object.keys(data).length > 0) {
+        operations.push({ type: "update", collection: "users", docId: id, data });
+      }
+    });
+
+    if (operations.length > 0) {
+      await batchWrite(operations);
+    }
+
+    await createActivityLog({
+      userId: updatedByUserId,
+      action: "user-updated",
+      description: managerId
+        ? `Assigned ${users.length} user(s) to ${manager?.name || managerId}`
+        : `Unassigned ${users.length} user(s) from their manager`,
+      entityType: "user",
+      entityId: managerId || uniqueIds[0],
+    });
+
+    logger.info(`Set manager of ${users.length} users to ${managerId ?? "none"}`);
+  } catch (error) {
+    logger.error("Error setting users' manager", error);
     throw error;
   }
 }
@@ -277,65 +654,7 @@ export async function assignUsersToManager(
   userIds: string[],
   updatedByUserId: string
 ): Promise<void> {
-  try {
-    const manager = await getUserById(managerId);
-    if (!manager) {
-      throw new NotFoundError(`Manager ${managerId} not found`);
-    }
-
-    const operations = [];
-
-    // Add users to manager's list based on role
-    if (manager.role === "sro" && "assignedROIds" in manager) {
-      const currentROIds = (manager as any).assignedROIds || [];
-      const newROIds = [...new Set([...currentROIds, ...userIds])];
-
-      operations.push({
-        type: "update" as const,
-        collection: "users",
-        docId: managerId,
-        data: { assignedROIds: newROIds },
-      });
-    } else if (manager.role === "ro" && "assignedYouthLeaderIds" in manager) {
-      const currentYLIds = (manager as any).assignedYouthLeaderIds || [];
-      const newYLIds = [...new Set([...currentYLIds, ...userIds])];
-
-      operations.push({
-        type: "update" as const,
-        collection: "users",
-        docId: managerId,
-        data: { assignedYouthLeaderIds: newYLIds },
-      });
-    }
-
-    // Update reporting relationship for assigned users
-    userIds.forEach((userId) => {
-      operations.push({
-        type: "update" as const,
-        collection: "users",
-        docId: userId,
-        data: { reportingToId: managerId },
-      });
-    });
-
-    if (operations.length > 0) {
-      await batchWrite(operations);
-    }
-
-    // Log activity
-    await createActivityLog({
-      userId: updatedByUserId,
-      action: "user-updated",
-      description: `Assigned ${userIds.length} users to manager ${managerId}`,
-      entityType: "user",
-      entityId: managerId,
-    });
-
-    logger.info(`Assigned ${userIds.length} users to manager ${managerId}`);
-  } catch (error) {
-    logger.error(`Error assigning users to manager`, error);
-    throw error;
-  }
+  return setUsersManager(userIds, managerId, updatedByUserId);
 }
 
 /**
@@ -371,7 +690,8 @@ export async function changeUserRole(
     const oldRole = user.role;
 
     // Update role
-    await firebaseUpdateDoc("users", userId, { role: newRole });
+    await updateDoc("users", userId, { role: newRole });
+    await getFirebaseAdminAuth().setCustomUserClaims(userId, { role: newRole });
 
     // Log activity
     await createActivityLog({

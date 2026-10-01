@@ -1,6 +1,15 @@
+"use client";
+
 import { useState, useCallback, useEffect } from "react";
 import { create } from "zustand";
+import { apiFetch, apiFetchPage, errorMessage, type PageMeta } from "@/lib/api-client";
 import { User, UserRole, UserStatus, CreateUserRequest, UpdateUserRequest } from "@/types/user.types";
+
+/**
+ * User hooks. Every request goes through apiFetch, which attaches a fresh
+ * Firebase ID token — the previous versions sent no Authorization header and
+ * would have been rejected with 401 by every route.
+ */
 
 // Zustand store for user state management
 interface UserStoreState {
@@ -33,34 +42,20 @@ export function useCurrentUser() {
 
   const fetchCurrentUser = useCallback(async () => {
     try {
-      useUserStore.setState({ loading: true });
-      const response = await fetch("/api/users/me");
-
-      if (!response.ok) {
-        throw new Error("Failed to fetch current user");
-      }
-
-      const data = await response.json();
-      setCurrentUser(data.data);
+      useUserStore.setState({ loading: true, error: null });
+      setCurrentUser(await apiFetch<User>("/api/users/me"));
     } catch (err) {
-      useUserStore.setState({
-        error: err instanceof Error ? err.message : "An error occurred",
-      });
+      useUserStore.setState({ error: errorMessage(err, "Failed to fetch current user") });
     } finally {
       useUserStore.setState({ loading: false });
     }
   }, [setCurrentUser]);
 
-  return {
-    user: currentUser,
-    loading,
-    error,
-    fetchCurrentUser,
-  };
+  return { user: currentUser, loading, error, fetchCurrentUser };
 }
 
 /**
- * Hook to fetch all users with filters
+ * Hook to fetch one page of users with filters
  */
 export function useUsers(filters?: {
   role?: UserRole;
@@ -69,47 +64,38 @@ export function useUsers(filters?: {
   pageSize?: number;
   pageNumber?: number;
 }) {
-  const { users, setUsers, loading, error } = useUserStore();
+  const { users, setUsers, error } = useUserStore();
   const [isFetching, setIsFetching] = useState(false);
+  const [meta, setMeta] = useState<PageMeta | null>(null);
+  const filterKey = JSON.stringify(filters || {});
 
   const fetchUsers = useCallback(async () => {
     try {
       setIsFetching(true);
+      useUserStore.setState({ error: null });
+      const parsed = JSON.parse(filterKey) as NonNullable<typeof filters>;
       const params = new URLSearchParams();
+      if (parsed.role) params.append("role", parsed.role);
+      if (parsed.status) params.append("status", parsed.status);
+      if (parsed.reportingToId) params.append("reportingToId", parsed.reportingToId);
+      if (parsed.pageSize) params.append("pageSize", String(parsed.pageSize));
+      if (parsed.pageNumber) params.append("pageNumber", String(parsed.pageNumber));
 
-      if (filters?.role) params.append("role", filters.role);
-      if (filters?.status) params.append("status", filters.status);
-      if (filters?.reportingToId) params.append("reportingToId", filters.reportingToId);
-      if (filters?.pageSize) params.append("pageSize", filters.pageSize.toString());
-      if (filters?.pageNumber) params.append("pageNumber", filters.pageNumber.toString());
-
-      const response = await fetch(`/api/users?${params.toString()}`);
-
-      if (!response.ok) {
-        throw new Error("Failed to fetch users");
-      }
-
-      const data = await response.json();
-      setUsers(data.data);
+      const page = await apiFetchPage<User>(`/api/users?${params.toString()}`);
+      setUsers(page.items);
+      setMeta(page.meta);
     } catch (err) {
-      useUserStore.setState({
-        error: err instanceof Error ? err.message : "An error occurred",
-      });
+      useUserStore.setState({ error: errorMessage(err, "Failed to fetch users") });
     } finally {
       setIsFetching(false);
     }
-  }, [filters, setUsers]);
+  }, [filterKey, setUsers]);
 
   useEffect(() => {
     fetchUsers();
   }, [fetchUsers]);
 
-  return {
-    users,
-    loading: isFetching || loading,
-    error,
-    refetch: fetchUsers,
-  };
+  return { users, meta, loading: isFetching, error, refetch: fetchUsers };
 }
 
 /**
@@ -122,19 +108,12 @@ export function useUser(userId: string) {
 
   const fetchUser = useCallback(async () => {
     if (!userId) return;
-
     try {
       setLoading(true);
-      const response = await fetch(`/api/users/${userId}`);
-
-      if (!response.ok) {
-        throw new Error("Failed to fetch user");
-      }
-
-      const data = await response.json();
-      setUser(data.data);
+      setError(null);
+      setUser(await apiFetch<User>(`/api/users/${userId}`));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "An error occurred");
+      setError(errorMessage(err, "Failed to fetch user"));
     } finally {
       setLoading(false);
     }
@@ -144,123 +123,70 @@ export function useUser(userId: string) {
     fetchUser();
   }, [fetchUser]);
 
-  return {
-    user,
-    loading,
-    error,
-    refetch: fetchUser,
-  };
+  return { user, loading, error, refetch: fetchUser };
+}
+
+/** Wraps a mutation with loading/error state; resolves to the result or null on failure. */
+function useMutation<Args extends unknown[], Result>(run: (...args: Args) => Promise<Result>, fallback: string) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const mutate = useCallback(
+    async (...args: Args): Promise<Result | null> => {
+      try {
+        setLoading(true);
+        setError(null);
+        return await run(...args);
+      } catch (err) {
+        setError(errorMessage(err, fallback));
+        return null;
+      } finally {
+        setLoading(false);
+      }
+    },
+    // run/fallback are module-level constants at each call site below.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []
+  );
+
+  return { mutate, loading, error };
 }
 
 /**
  * Hook to create a new user
  */
 export function useCreateUser() {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const createUser = useCallback(async (userData: CreateUserRequest): Promise<User | null> => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      const response = await fetch("/api/users", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(userData),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error?.message || "Failed to create user");
-      }
-
-      const data = await response.json();
-      return data.data;
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "An error occurred";
-      setError(errorMessage);
-      return null;
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  return { createUser, loading, error };
+  const { mutate, loading, error } = useMutation(
+    (userData: CreateUserRequest) => apiFetch<User>("/api/users", { method: "POST", body: userData }),
+    "Failed to create user"
+  );
+  return { createUser: mutate, loading, error };
 }
 
 /**
  * Hook to update a user
  */
 export function useUpdateUser() {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const updateUser = useCallback(
-    async (userId: string, userData: UpdateUserRequest): Promise<User | null> => {
-      try {
-        setLoading(true);
-        setError(null);
-
-        const response = await fetch(`/api/users/${userId}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(userData),
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error?.message || "Failed to update user");
-        }
-
-        const data = await response.json();
-        return data.data;
-      } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : "An error occurred";
-        setError(errorMessage);
-        return null;
-      } finally {
-        setLoading(false);
-      }
-    },
-    []
+  const { mutate, loading, error } = useMutation(
+    (userId: string, userData: UpdateUserRequest) =>
+      apiFetch<User>(`/api/users/${userId}`, { method: "PUT", body: userData }),
+    "Failed to update user"
   );
-
-  return { updateUser, loading, error };
+  return { updateUser: mutate, loading, error };
 }
 
 /**
  * Hook to delete a user
  */
 export function useDeleteUser() {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const deleteUser = useCallback(async (userId: string): Promise<boolean> => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      const response = await fetch(`/api/users/${userId}`, {
-        method: "DELETE",
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error?.message || "Failed to delete user");
-      }
-
+  const { mutate, loading, error } = useMutation(
+    async (userId: string) => {
+      await apiFetch(`/api/users/${userId}`, { method: "DELETE" });
       return true;
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "An error occurred";
-      setError(errorMessage);
-      return false;
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  return { deleteUser, loading, error };
+    },
+    "Failed to delete user"
+  );
+  return { deleteUser: async (userId: string) => (await mutate(userId)) === true, loading, error };
 }
 
 /**
@@ -273,19 +199,12 @@ export function useUsersReportingTo(managerId: string) {
 
   const fetchUsers = useCallback(async () => {
     if (!managerId) return;
-
     try {
       setLoading(true);
-      const response = await fetch(`/api/users/${managerId}/reports`);
-
-      if (!response.ok) {
-        throw new Error("Failed to fetch users");
-      }
-
-      const data = await response.json();
-      setUsers(data.data);
+      setError(null);
+      setUsers(await apiFetch<User[]>(`/api/users/${managerId}/reports`));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "An error occurred");
+      setError(errorMessage(err, "Failed to fetch users"));
     } finally {
       setLoading(false);
     }
@@ -295,51 +214,25 @@ export function useUsersReportingTo(managerId: string) {
     fetchUsers();
   }, [fetchUsers]);
 
-  return {
-    users,
-    loading,
-    error,
-    refetch: fetchUsers,
-  };
+  return { users, loading, error, refetch: fetchUsers };
 }
 
 /**
  * Hook to assign users to a manager
  */
 export function useAssignUsers() {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const assignUsers = useCallback(
-    async (managerId: string, userIds: string[]): Promise<boolean> => {
-      try {
-        setLoading(true);
-        setError(null);
-
-        const response = await fetch(`/api/users/${managerId}/assign`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ userIds }),
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error?.message || "Failed to assign users");
-        }
-
-        return true;
-      } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : "An error occurred";
-        setError(errorMessage);
-        return false;
-      } finally {
-        setLoading(false);
-      }
+  const { mutate, loading, error } = useMutation(
+    async (managerId: string, userIds: string[]) => {
+      await apiFetch(`/api/users/${managerId}/assign`, { method: "POST", body: { userIds } });
+      return true;
     },
-    []
+    "Failed to assign users"
   );
-
-  return { assignUsers, loading, error };
+  return {
+    assignUsers: async (managerId: string, userIds: string[]) => (await mutate(managerId, userIds)) === true,
+    loading,
+    error,
+  };
 }
 
 /**
@@ -353,16 +246,10 @@ export function useUsersByRole(role: UserRole) {
   const fetchUsers = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await fetch(`/api/users/role/${role}`);
-
-      if (!response.ok) {
-        throw new Error("Failed to fetch users");
-      }
-
-      const data = await response.json();
-      setUsers(data.data);
+      setError(null);
+      setUsers(await apiFetch<User[]>(`/api/users/role/${role}`));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "An error occurred");
+      setError(errorMessage(err, "Failed to fetch users"));
     } finally {
       setLoading(false);
     }
@@ -372,10 +259,5 @@ export function useUsersByRole(role: UserRole) {
     fetchUsers();
   }, [fetchUsers]);
 
-  return {
-    users,
-    loading,
-    error,
-    refetch: fetchUsers,
-  };
+  return { users, loading, error, refetch: fetchUsers };
 }

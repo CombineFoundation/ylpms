@@ -3,7 +3,8 @@ import { AuthenticationError, AuthorizationError } from "./errors";
 import { UserRole } from "@/types/user.types";
 
 export interface DecodedToken {
-  userId: string;
+  userId?: string;
+  sub?: string;
   email: string;
   role: UserRole;
   iat: number;
@@ -11,7 +12,8 @@ export interface DecodedToken {
 }
 
 // Role hierarchy for permission checking
-const roleHierarchy: Record<UserRole, number> = {
+export const roleHierarchy: Record<UserRole, number> = {
+  developer: 6,
   "head-ro": 5,
   "sro": 4,
   "ro": 3,
@@ -35,7 +37,12 @@ export function verifyToken(token: string): DecodedToken {
       throw new AuthenticationError("Token has expired");
     }
 
-    return decoded;
+    const userId = decoded.userId || decoded.sub;
+    if (!userId || !decoded.email || !decoded.role) {
+      throw new AuthenticationError("Token is missing required claims");
+    }
+
+    return { ...decoded, userId };
   } catch (error) {
     if (error instanceof AuthenticationError) {
       throw error;
@@ -112,6 +119,16 @@ export function requireRole(userRole: UserRole, requiredRole: UserRole | UserRol
     throw new AuthorizationError(
       `This action requires ${Array.isArray(requiredRole) ? requiredRole.join(" or ") : requiredRole} role`
     );
+  }
+}
+
+/**
+ * Exact-role gate (no hierarchy): for screens scoped to the caller's own team,
+ * where a higher role has no team of that kind to show.
+ */
+export function requireExactRole(userRole: UserRole, role: UserRole, message?: string): void {
+  if (userRole !== role) {
+    throw new AuthorizationError(message ?? `Only ${role} accounts can access this`);
   }
 }
 

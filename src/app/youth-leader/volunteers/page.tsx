@@ -1,8 +1,8 @@
-"use client";
-
-import React from "react";
+import type { Metadata } from "next";
 import { VolunteerList } from "@/components/Youth-Leader/volunteers/VolunteerList";
 
-export default function VolunteersPage() {
+export const metadata: Metadata = { title: "My Volunteers" };
+
+export default function Page() {
   return <VolunteerList />;
 }

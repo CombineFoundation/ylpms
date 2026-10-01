@@ -8,9 +8,12 @@ export type ActivityAction =
   | "task-created" 
   | "task-updated" 
   | "task-completed" 
-  | "report-submitted" 
-  | "event-created" 
-  | "course-enrolled" 
+  | "report-submitted"
+  | "report-reviewed"
+  | "event-created"
+  | "event-updated"
+  | "certificate-issued"
+  | "course-enrolled"
   | "other";
 
 export interface ActivityLog {
@@ -18,9 +21,9 @@ export interface ActivityLog {
   userId: string; // Who performed the action
   action: ActivityAction;
   description: string;
-  entityType: "user" | "task" | "report" | "event" | "course" | "volunteer" | "other";
+  entityType: "user" | "task" | "report" | "event" | "course" | "volunteer" | "cohort" | "other";
   entityId: string; // ID of the entity being acted upon
-  changes?: Record<string, { oldValue: any; newValue: any }>;
+  changes?: Record<string, { oldValue: unknown; newValue: unknown }>;
   ipAddress?: string;
   userAgent?: string;
   createdAt: Timestamp | Date;
@@ -30,8 +33,8 @@ export interface CreateActivityLogRequest {
   userId: string;
   action: ActivityAction;
   description: string;
-  entityType: "user" | "task" | "report" | "event" | "course" | "volunteer" | "other";
+  entityType: "user" | "task" | "report" | "event" | "course" | "volunteer" | "cohort" | "other";
   entityId: string;
-  changes?: Record<string, { oldValue: any; newValue: any }>;
+  changes?: Record<string, { oldValue: unknown; newValue: unknown }>;
   ipAddress?: string;
 }

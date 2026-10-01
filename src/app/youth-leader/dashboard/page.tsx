@@ -1,8 +1,8 @@
-"use client";
-
-import React from "react";
+import type { Metadata } from "next";
 import { DashboardContent } from "@/components/Youth-Leader/dashboard/DashboardContent";
 
-export default function DashboardPage() {
+export const metadata: Metadata = { title: "Dashboard" };
+
+export default function Page() {
   return <DashboardContent />;
 }

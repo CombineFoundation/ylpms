@@ -1,5 +1,6 @@
 // User roles in the hierarchy
 export type UserRole = 
+  | "developer"
   | "head-ro" 
   | "sro" 
   | "ro" 
@@ -14,8 +15,16 @@ export interface BaseUser {
   id: string;
   email: string;
   name: string;
+  /** Program ID entered at creation (upper-case, unique). Older accounts may not have one. */
+  memberId?: string;
+  /** University (students) or institution; counted on the public site. */
+  university?: string;
+  /** Youth leaders and volunteers: the cohort they joined (e.g. "ylp-2"); none means YLP 2.0. */
+  cohortId?: string;
+  region?: string;
   role: UserRole;
   status: UserStatus;
+  lastLoginAt?: Date;
   phone?: string;
   profilePicture?: string;
   createdAt: Date;
@@ -68,17 +77,23 @@ export type User = HeadRO | SRO | RO | YouthLeader | Volunteer;
 export interface CreateUserRequest {
   email: string;
   name: string;
+  region?: string;
   role: UserRole;
   phone?: string;
   parentId?: string; // For users being added by superiors
+  memberId?: string;
+  university?: string;
 }
 
 // User update request
 export interface UpdateUserRequest {
   name?: string;
   phone?: string;
+  region?: string;
   profilePicture?: string;
   status?: UserStatus;
+  memberId?: string;
+  university?: string;
 }
 
 // Authentication response

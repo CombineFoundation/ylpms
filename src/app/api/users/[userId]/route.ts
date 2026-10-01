@@ -1,166 +1,107 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { withAuth } from "@/middleware/auth.middleware";
-import {
-  getUserById,
-  updateUser,
-  deleteUser,
-  getUsersReportingTo,
-  assignUsersToManager,
-} from "@/services/user.service";
-import { updateUserSchema } from "@/utils/validation";
-import { requireResourceAccess, requireCanManage, canAccessResource } from "@/utils/auth";
-import { handleError, AuthorizationError } from "@/utils/errors";
+import { getUserById, updateUser, deleteUser, getUserDeletionImpact } from "@/services/user.service";
+import { selfUpdateUserSchema, updateUserSchema } from "@/utils/validation";
+import { requireCanManageUser, requireUserChainAccess } from "@/utils/authorization";
+import { AuthenticationError, AuthorizationError, NotFoundError } from "@/utils/errors";
+import { apiError, apiSuccess } from "@/utils/api-response";
+
+type Params = { params: Promise<{ userId: string }> };
 
 /**
  * GET /api/users/[userId] - Get specific user
+ * GET /api/users/[userId]?include=deletion-impact - also report what deleting them would affect
  */
-export async function GET(
-  req: NextRequest,
-  { params }: { params: { userId: string } }
-) {
+export async function GET(req: NextRequest, { params }: Params) {
+  const { userId } = await params;
   return withAuth(async (authReq) => {
     try {
-      if (!authReq.user) {
-        return NextResponse.json(handleError(new Error("Unauthorized")), {
-          status: 401,
-        });
+      if (!authReq.user) throw new AuthenticationError();
+
+      const user = await getUserById(userId);
+      if (!user) throw new NotFoundError("User not found");
+
+      await requireUserChainAccess(authReq.user, user);
+
+      if (new URL(authReq.url).searchParams.get("include") === "deletion-impact") {
+        await requireCanManageUser(authReq.user, user);
+        return apiSuccess({ ...user, deletionImpact: await getUserDeletionImpact(userId) });
       }
 
-      const user = await getUserById(params.userId);
-
-      if (!user) {
-        return NextResponse.json(
-          handleError(new Error("User not found")),
-          { status: 404 }
-        );
-      }
-
-      // Check if user can access this resource
-      if (
-        !canAccessResource(
-          authReq.user.userId,
-          params.userId,
-          authReq.user.role,
-          user.role
-        )
-      ) {
-        throw new AuthorizationError();
-      }
-
-      return NextResponse.json(
-        {
-          success: true,
-          data: user,
-        },
-        { status: 200 }
-      );
+      return apiSuccess(user);
     } catch (error) {
-      return NextResponse.json(handleError(error), {
-        status: (error as any).statusCode || 500,
-      });
+      return apiError(error);
     }
   })(req);
 }
 
 /**
  * PUT /api/users/[userId] - Update user
+ *
+ * On your own profile you may change only name/phone/profilePicture (plus
+ * deactivating yourself); status and region changes require managing the user.
  */
-export async function PUT(
-  req: NextRequest,
-  { params }: { params: { userId: string } }
-) {
+export async function PUT(req: NextRequest, { params }: Params) {
+  const { userId } = await params;
   return withAuth(async (authReq) => {
     try {
-      if (!authReq.user) {
-        return NextResponse.json(handleError(new Error("Unauthorized")), {
-          status: 401,
-        });
-      }
+      if (!authReq.user) throw new AuthenticationError();
 
       const body = await req.json();
 
-      // Validate data
-      const validatedData = updateUserSchema.parse(body);
+      const user = await getUserById(userId);
+      if (!user) throw new NotFoundError("User not found");
 
-      // Get the user to check permissions
-      const user = await getUserById(params.userId);
-      if (!user) {
-        return NextResponse.json(
-          handleError(new Error("User not found")),
-          { status: 404 }
-        );
+      let validatedData;
+      if (authReq.user.userId === userId) {
+        const { status, ...rest } = body ?? {};
+        // Self-service deactivation is the only status change allowed on yourself.
+        if (status !== undefined && status !== "inactive") {
+          throw new AuthorizationError("You can't change your own account status");
+        }
+        validatedData = {
+          ...selfUpdateUserSchema.strict().parse(rest),
+          ...(status === "inactive" ? { status: "inactive" as const } : {}),
+        };
+      } else {
+        await requireCanManageUser(authReq.user, user);
+        validatedData = updateUserSchema.strict().parse(body);
       }
 
-      // Check permission
-      if (
-        authReq.user.userId !== params.userId &&
-        authReq.user.role !== "head-ro"
-      ) {
-        throw new AuthorizationError();
-      }
+      const updatedUser = await updateUser(userId, validatedData, authReq.user.userId);
 
-      const updatedUser = await updateUser(
-        params.userId,
-        validatedData,
-        authReq.user.userId
-      );
-
-      return NextResponse.json(
-        {
-          success: true,
-          data: updatedUser,
-        },
-        { status: 200 }
-      );
+      return apiSuccess(updatedUser);
     } catch (error) {
-      return NextResponse.json(handleError(error), {
-        status: (error as any).statusCode || 500,
-      });
+      return apiError(error);
     }
   })(req);
 }
 
 /**
- * DELETE /api/users/[userId] - Delete user (archive)
+ * DELETE /api/users/[userId] - Permanently delete user document
  */
-export async function DELETE(
-  req: NextRequest,
-  { params }: { params: { userId: string } }
-) {
+export async function DELETE(req: NextRequest, { params }: Params) {
+  const { userId } = await params;
   return withAuth(async (authReq) => {
     try {
-      if (!authReq.user) {
-        return NextResponse.json(handleError(new Error("Unauthorized")), {
-          status: 401,
-        });
-      }
+      if (!authReq.user) throw new AuthenticationError();
 
-      // Only Head RO can delete users
-      if (authReq.user.role !== "head-ro") {
+      // Only Head RO / developer can delete users
+      if (authReq.user.role !== "head-ro" && authReq.user.role !== "developer") {
         throw new AuthorizationError();
       }
 
-      const user = await getUserById(params.userId);
-      if (!user) {
-        return NextResponse.json(
-          handleError(new Error("User not found")),
-          { status: 404 }
-        );
-      }
+      const user = await getUserById(userId);
+      if (!user) throw new NotFoundError("User not found");
 
-      await deleteUser(params.userId, authReq.user.userId);
+      // Blocks deleting yourself and anyone at or above your own role.
+      await requireCanManageUser(authReq.user, user);
 
-      return NextResponse.json(
-        {
-          success: true,
-          data: { message: "User deleted successfully" },
-        },
-        { status: 200 }
-      );
+      await deleteUser(userId, authReq.user.userId);
+
+      return apiSuccess({ message: "User deleted successfully" });
     } catch (error) {
-      return NextResponse.json(handleError(error), {
-        status: (error as any).statusCode || 500,
-      });
+      return apiError(error);
     }
   })(req);
 }

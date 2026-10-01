@@ -5,8 +5,10 @@ export type NotificationType =
   | "task-completed" 
   | "report-submitted" 
   | "user-added" 
-  | "event-created" 
-  | "course-enrolled" 
+  | "event-created"
+  | "event-updated"
+  | "certificate-issued"
+  | "course-enrolled"
   | "assignment-graded" 
   | "system-alert"
   | "other";
@@ -18,7 +20,7 @@ export interface Notification {
   title: string;
   message: string;
   relatedId?: string; // ID of related entity (task, report, etc.)
-  relatedType?: "task" | "report" | "user" | "event" | "course" | "assignment";
+  relatedType?: "task" | "report" | "user" | "event" | "course" | "assignment" | "certificate";
   read: boolean;
   actionUrl?: string;
   createdAt: Timestamp | Date;
@@ -31,7 +33,7 @@ export interface CreateNotificationRequest {
   title: string;
   message: string;
   relatedId?: string;
-  relatedType?: "task" | "report" | "user" | "event" | "course" | "assignment";
+  relatedType?: "task" | "report" | "user" | "event" | "course" | "assignment" | "certificate";
   actionUrl?: string;
 }
 

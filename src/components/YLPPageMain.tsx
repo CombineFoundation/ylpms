@@ -2,13 +2,9 @@
 
 import Image from "next/image";
 import { useEffect, useState } from "react";
-
-const heroStats = [
-  { value: "100+", label: "Youth Leaders" },
-  { value: "1,200+", label: "Volunteers" },
-  { value: "100+", label: "Universities" },
-  { value: "10,000+", label: "Beneficiaries" },
-];
+import { YLP_1 } from "@/config/cohorts";
+import { formatCount, formatProgramDate, formatReach } from "@/utils/impact-format";
+import type { PublicStats } from "@/types/public-stats.types";
 
 const benefitCards = [
   {
@@ -96,7 +92,7 @@ const faqItems = [
   },
   {
     question: "Is there any previous success in the Youth Leadership Program?",
-    answer: "Yes. YLP 1.0 successfully engaged more than 60 Youth Leaders and over 300 volunteers from universities across Pakistan.",
+    answer: `Yes. YLP 1.0 (${formatProgramDate(YLP_1.startDate)} – ${formatProgramDate(YLP_1.endDate)}) engaged ${YLP_1.youthLeaders} Youth Leaders and ${YLP_1.volunteers} volunteers from ${YLP_1.universities} universities across ${YLP_1.cities} cities, reaching ${formatCount(YLP_1.directBeneficiaries)} direct beneficiaries.`,
   },
   {
     question: "How do I become part of YLP 2.0?",
@@ -153,7 +149,15 @@ const galleryItems = [
   },
 ];
 
-export default function YLPPageMain() {
+/** The public landing page. `stats` are YLP 1.0's results plus live counts from YLP 2.0 onwards. */
+export default function YLPPageMain({ stats }: { stats: PublicStats }) {
+  const { total, ylp1 } = stats;
+  const heroStats = [
+    { value: formatCount(total.youthLeaders), label: "Youth Leaders" },
+    { value: formatCount(total.volunteers), label: "Volunteers" },
+    { value: formatCount(total.universities), label: "Universities" },
+    { value: formatCount(total.directBeneficiaries), label: "Direct Beneficiaries" },
+  ];
   const [menuOpen, setMenuOpen] = useState(false);
   const [openFaqIndex, setOpenFaqIndex] = useState(0);
 
@@ -392,15 +396,15 @@ export default function YLPPageMain() {
               </p>
               <div className="why-stat-row">
                 <div>
-                  <span className="n">40+<br/></span>
+                  <span className="n">{formatCount(total.studentBodyPartnerships)}<br/></span>
                   <span className="l">Student body partnerships</span>
                 </div>
                 <div>
-                  <span className="n">5M+<br/></span>
+                  <span className="n">{formatReach(total.digitalReach)}<br/></span>
                   <span className="l">Digital reach</span>
                 </div>
                 <div>
-                  <span className="n">100+<br/></span>
+                  <span className="n">{formatCount(total.webinars + total.onsiteWorkshops)}<br/></span>
                   <span className="l">Workshops & webinars</span>
                 </div>
               </div>
@@ -459,20 +463,23 @@ export default function YLPPageMain() {
         <section className="impact">
           <div className="container">
             <div className="section-head center reveal">
-              <div className="eyebrow" style={{ justifyContent: "center" }}>The vision</div>
-              <h2>Why we call it Pakistan&apos;s largest</h2>
-              <p>YLP 2.0 is built to create nationwide impact. Here&apos;s the scale we&apos;re working toward.</p>
+              <div className="eyebrow" style={{ justifyContent: "center" }}>Our impact</div>
+              <h2>Impact so far</h2>
+              <p>
+                YLP 1.0 and {stats.current.name} combined.
+                {stats.isLive && " Updated automatically as activities are held."}
+              </p>
             </div>
             <div className="impact-grid">
               {[
-                { value: "100+", label: "Youth Leaders" },
-                { value: "1,200+", label: "Volunteers" },
-                { value: "100+", label: "Universities" },
-                { value: "40+", label: "Student Body Partnerships" },
-                { value: "100+", label: "Workshops & Webinars" },
-                { value: "10,000+", label: "Direct Beneficiaries" },
-                { value: "5M+", label: "Digital Reach" },
-                { value: "6", label: "Months of Impact" },
+                { value: formatCount(total.youthLeaders), label: "Youth Leaders" },
+                { value: formatCount(total.volunteers), label: "Volunteers" },
+                { value: formatCount(total.universities), label: "Universities" },
+                { value: formatCount(total.cities), label: "Cities" },
+                { value: formatCount(total.webinars), label: "Webinars" },
+                { value: formatCount(total.onsiteWorkshops), label: "Onsite Workshops" },
+                { value: formatCount(total.directBeneficiaries), label: "Direct Beneficiaries" },
+                { value: formatCount(total.certificates), label: "Certificates Issued" },
               ].map((item) => (
                 <div key={item.label} className="i-card reveal">
                   <div className="num">{item.value}</div>
@@ -544,18 +551,26 @@ export default function YLPPageMain() {
                 Built on the success of YLP 1.0
               </h2>
               <p style={{ color: "var(--gray)", fontSize: "1.05rem" }}>
-                YLP 2.0 stands on a strong foundation. The first chapter of the Youth Leadership Program engaged students nationwide through webinars, campaigns, university collaborations and community events proving what young people can achieve when given the right opportunity.
+                YLP 2.0 stands on a strong foundation. The first chapter of the Youth Leadership Program ran from{" "}
+                {formatProgramDate(YLP_1.startDate)} to {formatProgramDate(YLP_1.endDate)}, engaging students through webinars,
+                campaigns, university collaborations and community events across {ylp1.cities} cities, with{" "}
+                {ylp1.studentBodyPartnerships} student body partnerships and a digital reach of {formatReach(ylp1.digitalReach)}.
               </p>
             </div>
             <div className="legacy-stats reveal">
-              <div className="l-card">
-                <div className="num">60+</div>
-                <div className="lbl">Youth Leaders engaged</div>
-              </div>
-              <div className="l-card">
-                <div className="num">4000+</div>
-                <div className="lbl">Direct Beneficiaries</div>
-              </div>
+              {[
+                { value: formatCount(ylp1.youthLeaders), label: "Youth Leaders" },
+                { value: formatCount(ylp1.volunteers), label: "Volunteers" },
+                { value: formatCount(ylp1.universities), label: "Universities" },
+                { value: formatCount(ylp1.webinars + ylp1.onsiteWorkshops), label: `Webinars & workshops (${ylp1.webinars} + ${ylp1.onsiteWorkshops} onsite)` },
+                { value: formatCount(ylp1.directBeneficiaries), label: "Direct Beneficiaries" },
+                { value: formatCount(ylp1.certificates), label: "Certificates to participants" },
+              ].map((item) => (
+                <div key={item.label} className="l-card">
+                  <div className="num">{item.value}</div>
+                  <div className="lbl">{item.label}</div>
+                </div>
+              ))}
             </div>
           </div>
         </section>

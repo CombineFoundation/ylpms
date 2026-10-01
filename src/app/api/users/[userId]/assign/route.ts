@@ -1,47 +1,50 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { withAuth } from "@/middleware/auth.middleware";
-import { assignUsersToManager } from "@/services/user.service";
-import { handleError, ValidationError, AuthorizationError } from "@/utils/errors";
+import { assignUsersToManager, getUserById } from "@/services/user.service";
+import { AuthenticationError, NotFoundError } from "@/utils/errors";
 import { requireRole } from "@/utils/auth";
+import { requireCanManageUser, requireUserChainAccess } from "@/utils/authorization";
+import { assignUsersSchema } from "@/utils/validation";
+import { getDocsByIds } from "@/utils/firestore";
+import { apiError, apiSuccess } from "@/utils/api-response";
+import type { User } from "@/types/user.types";
 
 /**
  * POST /api/users/[userId]/assign - Assign users to a manager
+ * Body: { userIds: string[] }
  */
 export async function POST(
   req: NextRequest,
-  { params }: { params: { userId: string } }
+  { params }: { params: Promise<{ userId: string }> }
 ) {
+  const { userId: managerId } = await params;
   return withAuth(async (authReq) => {
     try {
-      if (!authReq.user) {
-        return NextResponse.json(handleError(new Error("Unauthorized")), {
-          status: 401,
-        });
-      }
+      if (!authReq.user) throw new AuthenticationError();
 
       // Only managers can assign users
       requireRole(authReq.user.role, ["ro", "sro", "head-ro"]);
 
-      const body = await req.json();
-      const { userIds } = body;
+      const manager = await getUserById(managerId);
+      if (!manager) {
+        throw new NotFoundError("Manager not found");
+      }
+      await requireUserChainAccess(authReq.user, manager);
 
-      if (!Array.isArray(userIds) || userIds.length === 0) {
-        throw new ValidationError("userIds must be a non-empty array");
+      const { userIds } = assignUsersSchema.parse(await req.json());
+
+      // The caller must also be allowed to manage every user being moved.
+      const users = await getDocsByIds<User>("users", userIds);
+      for (const user of users) {
+        await requireCanManageUser(authReq.user, user);
       }
 
-      await assignUsersToManager(params.userId, userIds, authReq.user.userId);
+      // Role pairing + previous-manager cleanup are enforced in the service.
+      await assignUsersToManager(managerId, userIds, authReq.user.userId);
 
-      return NextResponse.json(
-        {
-          success: true,
-          data: { message: "Users assigned successfully" },
-        },
-        { status: 200 }
-      );
+      return apiSuccess({ message: "Users assigned successfully" });
     } catch (error) {
-      return NextResponse.json(handleError(error), {
-        status: (error as any).statusCode || 500,
-      });
+      return apiError(error);
     }
   })(req);
 }
