@@ -1,4 +1,5 @@
 import {
+  Award,
   BarChart2,
   Bell,
   BookOpen,
@@ -20,6 +21,7 @@ export const navItems = [
   { label: "Reports", href: "/RO/reports", icon: FileText },
   { label: "Training", href: "/RO/training", icon: BookOpen },
   { label: "Activities", href: "/RO/activities", icon: CalendarDays },
+  { label: "Certificates", href: "/RO/certificates", icon: Award },
   { label: "Analytics", href: "/RO/analytics", icon: BarChart2 },
   { label: "Notifications", href: "/RO/notifications", icon: Bell },
   { label: "Settings", href: "/RO/settings", icon: Settings },

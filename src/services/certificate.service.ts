@@ -4,6 +4,7 @@ import { canAccessUserInChain } from "@/utils/authorization";
 import { AuthorizationError, NotFoundError, logger } from "@/utils/errors";
 import { createActivityLog } from "./activitylog.service";
 import { notifyUsers } from "./notification.service";
+import { chunk, getTeam } from "./team.service";
 import type { Certificate, CertificateKind } from "@/types/certificate.types";
 import type { Event } from "@/types/event.types";
 import type { User, UserRole } from "@/types/user.types";
@@ -136,4 +137,92 @@ export async function getCertificateForViewer(
     if (!holder || !(await canAccessUserInChain(viewer, holder))) throw new AuthorizationError();
   }
   return certificate;
+}
+
+// ---------------------------------------------------------------------------
+// Team view (Head RO / SRO / RO)
+
+/** One verified activity's certificates, shown as a single row led by its organizer's certificate. */
+export interface TeamCertificateGroup {
+  eventId: string;
+  eventTitle: string;
+  eventLocation: string;
+  eventDate: Certificate["eventDate"];
+  issuedAt: Certificate["issuedAt"];
+  issuedByName: string;
+  /** The organizer's (usually the youth leader's) certificate; a participant's if no organizer is in scope. */
+  lead: Certificate;
+  /** Everyone in scope certified for this activity: organizers first, then participants by name. */
+  certificates: Certificate[];
+  participantCount: number;
+}
+
+export interface TeamCertificates {
+  groups: TeamCertificateGroup[];
+  totals: { certificates: number; activities: number; leadership: number; participation: number };
+}
+
+const time = (value: unknown) => toDate(value)?.getTime() ?? 0;
+
+/** Organizers first (youth leaders before others), then by name. */
+function byLeadership(a: Certificate, b: Certificate) {
+  const rank = (c: Certificate) => (c.kind === "organizer" ? (c.recipientRole === "youth-leader" ? 0 : 1) : 2);
+  return rank(a) - rank(b) || a.recipientName.localeCompare(b.recipientName);
+}
+
+/**
+ * Certificates issued to the viewer's team, grouped by activity so a youth
+ * leader's activity appears once (their certificate) with its volunteers'
+ * certificates as the details. Head RO / developer see the whole program; an
+ * SRO or RO sees themselves and everyone below them.
+ */
+export async function getTeamCertificates(viewer: { userId: string; role: UserRole }): Promise<TeamCertificates> {
+  try {
+    let certificates: Certificate[];
+    if (viewer.role === "head-ro" || viewer.role === "developer") {
+      certificates = await queryDocs<Certificate>(COLLECTION, [{ field: "status", operator: "==", value: "issued" }]);
+    } else {
+      const { memberIds } = await getTeam(viewer.userId);
+      const ids = [viewer.userId, ...memberIds];
+      certificates = (
+        await Promise.all(chunk(ids).map((group) => queryDocs<Certificate>(COLLECTION, [{ field: "userId", operator: "in", value: group }])))
+      )
+        .flat()
+        .filter((certificate) => certificate.status === "issued");
+    }
+
+    const byEvent = new Map<string, Certificate[]>();
+    certificates.forEach((certificate) => byEvent.set(certificate.eventId, [...(byEvent.get(certificate.eventId) ?? []), certificate]));
+
+    const groups: TeamCertificateGroup[] = [...byEvent.values()].map((list) => {
+      const sorted = [...list].sort(byLeadership);
+      const lead = sorted[0];
+      return {
+        eventId: lead.eventId,
+        eventTitle: lead.eventTitle,
+        eventLocation: lead.eventLocation,
+        eventDate: lead.eventDate,
+        issuedAt: list.reduce((earliest, c) => (time(c.issuedAt) < time(earliest) ? c.issuedAt : earliest), lead.issuedAt),
+        issuedByName: lead.issuedByName,
+        lead,
+        certificates: sorted,
+        participantCount: list.filter((c) => c.kind === "participation").length,
+      };
+    });
+    groups.sort((a, b) => time(b.issuedAt) - time(a.issuedAt));
+
+    const leadership = certificates.filter((c) => c.kind === "organizer").length;
+    return {
+      groups,
+      totals: {
+        certificates: certificates.length,
+        activities: groups.length,
+        leadership,
+        participation: certificates.length - leadership,
+      },
+    };
+  } catch (error) {
+    logger.error(`Error loading team certificates for ${viewer.userId}`, error);
+    throw error;
+  }
 }

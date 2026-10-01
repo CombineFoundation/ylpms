@@ -84,3 +84,38 @@ export function certificateHtml(certificate: ApiCertificate) {
 </body>
 </html>`;
 }
+
+/** Opens the certificate in its own window and triggers print (where it can be saved as a PDF). */
+export function printCertificate(certificate: ApiCertificate): boolean {
+  const url = URL.createObjectURL(new Blob([certificateHtml(certificate)], { type: "text/html" }));
+  const tab = window.open(url, "_blank");
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  return !!tab;
+}
+
+/** GET /api/certificates/team: one group per verified activity. */
+export type ApiTeamCertificateGroup = {
+  eventId: string;
+  eventTitle: string;
+  eventLocation: string;
+  eventDate: TimestampInput;
+  issuedAt: TimestampInput;
+  issuedByName: string;
+  lead: ApiCertificate;
+  certificates: ApiCertificate[];
+  participantCount: number;
+};
+
+export type ApiTeamCertificates = {
+  groups: ApiTeamCertificateGroup[];
+  totals: { certificates: number; activities: number; leadership: number; participation: number };
+};
+
+export const roleLabels: Partial<Record<UserRole, string>> = {
+  developer: "Developer",
+  "head-ro": "Head RO",
+  sro: "SRO",
+  ro: "RO",
+  "youth-leader": "Youth Leader",
+  volunteer: "Volunteer",
+};

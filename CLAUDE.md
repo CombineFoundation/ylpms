@@ -85,7 +85,7 @@ The SRO, RO, Youth Leader and Volunteer portals show one person's data. A user o
 
 ### Activity workflow (events → certificates)
 
-`src/services/event.service.ts` runs Create → Submit → Review → Approve → Conduct → Submit Evidence → Verify → Certificates. A youth leader's event starts as `draft`; their RO (or anyone above them in the chain) approves it and later verifies the evidence, which issues certificates (`src/services/certificate.service.ts`, `certificates` collection). Events organized by an RO or above start `planned` and complete when their organizer submits evidence. Status only changes through `POST /api/events/[eventId]/workflow`; the list endpoints return per-viewer `permissions` so the UI (`src/components/shared/activities/ActivityBoard.tsx`, used by every portal) never re-derives the rules.
+`src/services/event.service.ts` runs Create → Submit → Review → Approve → Conduct → Submit Evidence → Verify → Certificates. A youth leader's event starts as `draft`; their RO (or anyone above them in the chain) approves it and later verifies the evidence, which issues certificates (`src/services/certificate.service.ts`, `certificates` collection). Head RO, SRO and RO each have a Certificates page (`TeamCertificates`, `GET /api/certificates/team`) that groups their team's certificates by activity: one row led by the organizer's certificate, with participants in the details. Events organized by an RO or above start `planned` and complete when their organizer submits evidence. Status only changes through `POST /api/events/[eventId]/workflow`; the list endpoints return per-viewer `permissions` so the UI (`src/components/shared/activities/ActivityBoard.tsx`, used by every portal) never re-derives the rules.
 
 ### Member requests
 

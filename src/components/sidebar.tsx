@@ -24,6 +24,7 @@ import {
   X,
   ChevronRight,
   GraduationCap,
+  Award,
 } from "lucide-react";
 
 const navItems = [
@@ -34,6 +35,7 @@ const navItems = [
   { label: "Volunteers", href: "/Head-of-RO/volunteers", icon: Link2 },
   { label: "Tasks", href: "/Head-of-RO/tasks", icon: ClipboardList },
   { label: "Activities", href: "/Head-of-RO/activities", icon: Calendar },
+  { label: "Certificates", href: "/Head-of-RO/certificates", icon: Award },
   { label: "Reports", href: "/Head-of-RO/reports", icon: FileText },
   { label: "Training", href: "/Head-of-RO/training", icon: GraduationCap },
   { label: "Analytics", href: "/Head-of-RO/analytics", icon: BarChart3 },

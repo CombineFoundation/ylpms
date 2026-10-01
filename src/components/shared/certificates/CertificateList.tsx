@@ -6,15 +6,7 @@ import { usePortalData } from "@/hooks/usePortalScope";
 import type { ScopedRole } from "@/utils/portal-scope";
 import { PageHeader, SearchInput, emptyMessage } from "@/components/Head-of-RO/shared/ListParts";
 import { timestampToDate } from "@/utils/user-status";
-import { certificateHtml, formatCertificateDate, kindLabels, type ApiCertificate } from "./certificate.types";
-
-/** Opens the certificate in its own window and triggers print (where it can be saved as a PDF). */
-function printCertificate(certificate: ApiCertificate): boolean {
-  const url = URL.createObjectURL(new Blob([certificateHtml(certificate)], { type: "text/html" }));
-  const tab = window.open(url, "_blank");
-  setTimeout(() => URL.revokeObjectURL(url), 60_000);
-  return !!tab;
-}
+import { formatCertificateDate, kindLabels, printCertificate, type ApiCertificate } from "./certificate.types";
 
 /** The signed-in user's certificates, issued when activities they took part in are verified. */
 export function CertificateList({ portal }: { portal: ScopedRole }) {
