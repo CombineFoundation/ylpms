@@ -1,20 +1,8 @@
-"use client";
-
-import React from "react";
-import Sidebar from "@/components/SRO//Sidebar";
-import { Topbar } from "@/components/SRO/Topbar";
+import type { Metadata } from "next";
 import { NotificationList } from "@/components/SRO/notifications/NotificationList";
 
+export const metadata: Metadata = { title: "Notifications" };
+
 export default function NotificationsPage() {
-  return (
-    <div className="flex min-h-screen w-full bg-slate-50 font-sans">
-      <Sidebar />
-      <div className="flex-1 flex flex-col min-w-0">
-        <Topbar />
-        <main className="flex-1 flex flex-col p-6 lg:p-8">
-          <NotificationList />
-        </main>
-      </div>
-    </div>
-  );
+  return <NotificationList />;
 }

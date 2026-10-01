@@ -14,10 +14,6 @@ const firebaseConfig = {
 };
 
 function initFirebaseApp() {
-  if (typeof window === "undefined") {
-    throw new Error("Firebase can only be initialized in the browser.");
-  }
-
   if (!firebaseConfig.apiKey) {
     throw new Error(
       "Missing Firebase client config. Set NEXT_PUBLIC_FIREBASE_API_KEY and related env vars."

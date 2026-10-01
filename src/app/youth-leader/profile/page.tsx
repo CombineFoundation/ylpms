@@ -1,8 +1,6 @@
-"use client";
+import { redirect } from "next/navigation";
 
-import React from "react";
-import { ProfileContent } from "@/components/Youth-Leader/profile/ProfileContent";
-
+/** Profile editing lives on the Settings page. */
 export default function ProfilePage() {
-  return <ProfileContent />;
+  redirect("/youth-leader/settings");
 }

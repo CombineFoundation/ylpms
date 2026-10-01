@@ -1,264 +1,150 @@
 "use client";
 
-import { useState } from "react";
-import {
-  Search,
-  Eye,
-  Pencil,
-  Trash2,
-  ChevronRight,
-  Users,
-  Mail,
-  MapPin,
-  Calendar,
-  CheckCircle,
-} from "lucide-react";
+import { useMemo, useState } from "react";
+import { Plus } from "lucide-react";
+import { apiFetch, errorMessage } from "@/lib/api-client";
+import { scopedPath, usePortalData, usePortalScope } from "@/hooks/usePortalScope";
+import { ActionErrorBanner, FilterPills, PageHeader, SearchInput, emptyMessage } from "@/components/Head-of-RO/shared/ListParts";
+import { STATUS_FILTER_OPTIONS, type StatusFilter } from "@/components/Head-of-RO/shared/users";
+import { VolunteerTable, type TeamVolunteer } from "@/components/RO/volunteers/VolunteerTable";
+import { RequestList } from "@/components/RO/youth-leaders/RequestList";
+import { AddYouthLeaderModal } from "@/components/RO/youth-leaders/AddYouthLeaderModal";
+import type { AddYouthLeaderForm } from "@/components/RO/youth-leaders/youth-leader.types";
+import type { ApiMemberRequest } from "@/types/member-request.types";
 
-type Volunteer = {
-  id: string;
-  name: string;
-  email: string;
-  branch: string;
-  supervisor: string;
-  joined: string;
-  status: "Active" | "Inactive";
-  tasks: number;
-};
-
-const initialVolunteers: Volunteer[] = [
-  {
-    id: "1",
-    name: "Usman Raza",
-    email: "usman.raza@ypl.org",
-    branch: "Lahore East",
-    supervisor: "Zainab Ali",
-    joined: "Aug 10, 2025",
-    status: "Active",
-    tasks: 4,
-  },
-  {
-    id: "2",
-    name: "Sana Tariq",
-    email: "sana.tariq@ypl.org",
-    branch: "Lahore East",
-    supervisor: "Zainab Ali",
-    joined: "Aug 1, 2025",
-    status: "Active",
-    tasks: 3,
-  },
-  {
-    id: "3",
-    name: "Omar Sheikh",
-    email: "omar.sheikh@ypl.org",
-    branch: "Lahore West",
-    supervisor: "Ahmed Farooq",
-    joined: "Jul 15, 2025",
-    status: "Active",
-    tasks: 2,
-  },
-  {
-    id: "4",
-    name: "Maria Javed",
-    email: "maria.javed@ypl.org",
-    branch: "Karachi North",
-    supervisor: "Fatima Noor",
-    joined: "Jul 25, 2025",
-    status: "Active",
-    tasks: 5,
-  },
-  {
-    id: "5",
-    name: "Faisal Mahmood",
-    email: "faisal.mahmood@ypl.org",
-    branch: "Karachi South",
-    supervisor: "Ali Hassan",
-    joined: "Jun 30, 2025",
-    status: "Active",
-    tasks: 0,
-  },
-];
-
-const statusStyles = {
-  Active: "bg-emerald-100 text-emerald-600",
-  Inactive: "bg-gray-100 text-gray-400",
-};
-
+/**
+ * The youth leader's volunteers. New volunteers are requested here and only
+ * created once the youth leader's RO approves them.
+ */
 export function VolunteerList() {
-  const [volunteers] = useState<Volunteer[]>(initialVolunteers);
-  const [search, setSearch] = useState("");
-
-  const filtered = volunteers.filter(
-    (volunteer) =>
-      volunteer.name.toLowerCase().includes(search.toLowerCase()) ||
-      volunteer.branch.toLowerCase().includes(search.toLowerCase()) ||
-      volunteer.email.toLowerCase().includes(search.toLowerCase())
+  const { selectedId } = usePortalScope("youth-leader");
+  const volunteers = usePortalData<TeamVolunteer[]>("youth-leader", "/api/youth-leader/volunteers", "Unable to load volunteers.");
+  const requests = usePortalData<ApiMemberRequest[]>(
+    "youth-leader",
+    "/api/youth-leader/volunteer-requests",
+    "Unable to load your requests."
   );
 
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("All");
+  const [isAdding, setIsAdding] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [withdrawingId, setWithdrawingId] = useState<string | null>(null);
+
+  const rows = useMemo(() => volunteers.data ?? [], [volunteers.data]);
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return rows.filter(
+      (v) =>
+        (statusFilter === "All" || v.status === statusFilter) &&
+        (!q || [v.name, v.email ?? "", v.region ?? ""].some((value) => value.toLowerCase().includes(q)))
+    );
+  }, [rows, search, statusFilter]);
+
+  // Approved requests already show up in the volunteer table.
+  const openRequests = useMemo(() => (requests.data ?? []).filter((request) => request.status !== "approved"), [requests.data]);
+  const pendingCount = openRequests.filter((request) => request.status === "pending").length;
+
+  const handleAdd = async (values: AddYouthLeaderForm) => {
+    setFormError(null);
+    try {
+      const created = await apiFetch<ApiMemberRequest>(scopedPath("/api/youth-leader/volunteer-requests", "youth-leader", selectedId), {
+        method: "POST",
+        body: {
+          name: values.name,
+          email: values.email,
+          phone: values.phone || undefined,
+          region: values.region,
+          university: values.university,
+        },
+      });
+      requests.setData((current) => [created, ...(current ?? [])]);
+      setIsAdding(false);
+      setNotice(`Request to add ${values.name} was sent to your RO for approval.`);
+    } catch (error) {
+      setFormError(errorMessage(error, "Unable to send this request."));
+    }
+  };
+
+  const withdraw = async (request: ApiMemberRequest) => {
+    setActionError(null);
+    setWithdrawingId(request.id);
+    try {
+      await apiFetch(`/api/volunteer-requests/${request.id}`, { method: "DELETE" });
+      requests.setData((current) => current && current.filter((r) => r.id !== request.id));
+    } catch (error) {
+      setActionError(errorMessage(error, "Unable to withdraw this request."));
+    } finally {
+      setWithdrawingId(null);
+    }
+  };
+
+  const summary = volunteers.isLoading
+    ? "Loading your team..."
+    : `${rows.length} volunteer${rows.length === 1 ? "" : "s"} reporting to you${pendingCount > 0 ? ` · ${pendingCount} awaiting RO approval` : ""}.`;
+
   return (
-    <div>
-      {/* Page header */}
-      <div className="mb-5">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-bold text-gray-800">Volunteers</h1>
-            <p className="text-sm text-gray-500">
-              {filtered.length} members
-            </p>
-          </div>
-          <button className="flex items-center gap-1.5 text-sm font-medium text-white bg-[#E8622C] px-4 py-2 rounded-lg hover:bg-[#d45520] transition-colors">
-            <Users size={15} />
+    <div className="space-y-6">
+      <PageHeader
+        title="My Volunteers"
+        description={summary}
+        actions={
+          <button
+            type="button"
+            onClick={() => {
+              setFormError(null);
+              setIsAdding(true);
+            }}
+            className="flex items-center gap-1.5 rounded-lg bg-orange-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-orange-600"
+          >
+            <Plus size={15} />
             Add Volunteer
           </button>
-        </div>
-      </div>
+        }
+      />
 
-      {/* Table card */}
-      <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-        {/* Search bar */}
-        <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4 border-b border-gray-100">
-          <div className="relative w-64">
-            <Search
-              size={15}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-            />
-            <input
-              type="text"
-              placeholder="Search name or branch..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#E8622C]/30 focus:border-[#E8622C]"
-            />
+      {notice && (
+        <div role="status" className="flex items-center justify-between gap-3 rounded-lg border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+          <span>{notice}</span>
+          <button type="button" onClick={() => setNotice(null)} className="text-xs font-medium hover:underline">
+            Dismiss
+          </button>
+        </div>
+      )}
+      <ActionErrorBanner message={actionError ?? requests.error} onDismiss={() => setActionError(null)} />
+
+      <RequestList requests={openRequests} withdrawingId={withdrawingId} onWithdraw={withdraw} />
+
+      <section className="overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm">
+        <div className="flex flex-col gap-3 border-b border-gray-100 px-5 py-4 lg:flex-row lg:items-center">
+          <div className="lg:w-80">
+            <SearchInput value={search} onChange={setSearch} placeholder="Search by name, email or city..." />
           </div>
+          <FilterPills label="Status" options={STATUS_FILTER_OPTIONS} value={statusFilter} onChange={setStatusFilter} />
         </div>
+        <VolunteerTable
+          volunteers={filtered}
+          isLoading={volunteers.isLoading}
+          error={volunteers.error}
+          showManager={false}
+          emptyMessage={emptyMessage({
+            isFiltered: !!search.trim() || statusFilter !== "All",
+            noun: "volunteers",
+            emptyHint: "Use “Add Volunteer” to request one.",
+          })}
+        />
+      </section>
 
-        {/* Table */}
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-gray-100 bg-gray-50">
-                <th className="text-left text-xs font-semibold text-gray-500 px-5 py-3">
-                  Member
-                </th>
-                <th className="text-left text-xs font-semibold text-gray-500 px-4 py-3">
-                  Branch
-                </th>
-                <th className="text-left text-xs font-semibold text-gray-500 px-4 py-3">
-                  Supervisor
-                </th>
-                <th className="text-left text-xs font-semibold text-gray-500 px-4 py-3">
-                  Joined
-                </th>
-                <th className="text-left text-xs font-semibold text-gray-500 px-4 py-3">
-                  Status
-                </th>
-                <th className="text-left text-xs font-semibold text-gray-500 px-4 py-3">
-                  Tasks
-                </th>
-                <th className="text-left text-xs font-semibold text-gray-500 px-4 py-3">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((volunteer) => (
-                <tr key={volunteer.id} className="border-b border-gray-50 hover:bg-gray-50/60 transition-colors">
-                  <td className="px-5 py-4">
-                    <div>
-                      <p className="text-sm font-semibold text-gray-800">
-                        {volunteer.name}
-                      </p>
-                      <div className="flex items-center gap-1 mt-0.5">
-                        <Mail size={12} className="text-gray-400" />
-                        <span className="text-xs text-gray-400">{volunteer.email}</span>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-4 py-4 text-sm text-gray-600">
-                    <div className="flex items-center gap-1.5">
-                      <MapPin size={14} className="text-gray-400" />
-                      {volunteer.branch}
-                    </div>
-                  </td>
-                  <td className="px-4 py-4 text-sm text-gray-600">
-                    {volunteer.supervisor}
-                  </td>
-                  <td className="px-4 py-4">
-                    <div className="flex items-center gap-1.5 text-sm text-gray-500">
-                      <Calendar size={14} className="text-gray-400" />
-                      <span>{volunteer.joined}</span>
-                    </div>
-                  </td>
-                  <td className="px-4 py-4">
-                    <span
-                      className={`inline-block rounded-full px-3 py-1 text-xs font-semibold ${statusStyles[volunteer.status]}`}
-                    >
-                      {volunteer.status}
-                    </span>
-                  </td>
-                  <td className="px-4 py-4">
-                    <div className="flex items-center gap-1.5">
-                      <CheckCircle size={14} className="text-emerald-500" />
-                      <span className="text-sm font-semibold text-gray-700">
-                        {volunteer.tasks} active
-                      </span>
-                    </div>
-                  </td>
-                  <td className="px-4 py-4">
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        aria-label={`View ${volunteer.name}`}
-                        className="text-gray-400 hover:text-gray-600 transition-colors"
-                      >
-                        <Eye size={16} />
-                      </button>
-                      <button
-                        type="button"
-                        aria-label={`Edit ${volunteer.name}`}
-                        className="text-gray-400 hover:text-gray-600 transition-colors"
-                      >
-                        <Pencil size={16} />
-                      </button>
-                      <button
-                        type="button"
-                        aria-label={`Delete ${volunteer.name}`}
-                        className="text-gray-400 hover:text-red-500 transition-colors"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-
-              {filtered.length === 0 && (
-                <tr>
-                  <td
-                    colSpan={7}
-                    className="px-6 py-10 text-center text-sm text-gray-400"
-                  >
-                    No volunteers match your search.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Footer */}
-        <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4 border-t border-gray-100 bg-gray-50/50">
-          <div className="flex items-center gap-2 text-sm text-gray-600">
-            <span className="font-medium">Total Volunteers:</span>
-            <span className="text-gray-900 font-semibold">{filtered.length}</span>
-          </div>
-          <div className="flex items-center gap-2 text-xs text-gray-400">
-            <span>1-{filtered.length} of {filtered.length}</span>
-            <button className="text-gray-400 hover:text-gray-600 transition-colors">
-              <ChevronRight size={16} />
-            </button>
-          </div>
-        </div>
-      </div>
+      <AddYouthLeaderModal
+        isOpen={isAdding}
+        title="Add Volunteer"
+        approver="RO"
+        error={formError}
+        onClose={() => setIsAdding(false)}
+        onSubmit={handleAdd}
+      />
     </div>
   );
 }

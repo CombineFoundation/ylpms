@@ -1,8 +1,8 @@
-"use client";
+import type { Metadata } from "next";
+import { TeamTasksContent } from "@/components/SRO/tasks/SroTasksContent";
 
-import React from "react";
-import { TaskList } from "@/components/Youth-Leader/tasks/TaskList";
+export const metadata: Metadata = { title: "Tasks" };
 
-export default function TasksPage() {
-  return <TaskList />;
+export default function Page() {
+  return <TeamTasksContent portal="youth-leader" />;
 }

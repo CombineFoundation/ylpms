@@ -1,223 +1,150 @@
 "use client";
 
-import {
-  Users,
-  ClipboardList,
-  Calendar,
-  Award,
-  Clock,
-  CheckCircle,
-  AlertCircle,
-  MapPin,
-  User,
-} from "lucide-react";
+import Link from "next/link";
+import { Award, CalendarPlus, CalendarDays, HandHelping, ListChecks, Plus } from "lucide-react";
+import { usePortalData } from "@/hooks/usePortalScope";
+import { useCurrentProfile } from "@/hooks/useCurrentProfile";
+import { MonthlyPerformance } from "@/components/SRO/dashboard/MonthlyPerformance";
+import { RoPerformance } from "@/components/SRO/dashboard/RoPerformance";
+import { TaskOverview } from "@/components/SRO/dashboard/TaskOverview";
+import { RecentNotifications } from "@/components/SRO/dashboard/RecentNotifications";
+import { RecentReports } from "@/components/SRO/dashboard/RecentReports";
+import { ActivitySummaryPanel } from "@/components/shared/dashboard/ActivitySummaryPanel";
+import { PendingRequestsBanner } from "@/components/shared/dashboard/PendingRequestsBanner";
+import { DashboardSkeleton } from "@/components/shared/dashboard/DashboardSkeleton";
+import { ActivityPipeline } from "./ActivityPipeline";
+import type { YouthLeaderDashboardSummary } from "./dashboard.types";
 
-// Stat Cards Data
-const statCards = [
-  {
-    label: "My Volunteers",
-    value: "8",
-    icon: Users,
-    color: "bg-blue-100 text-blue-500",
-  },
-  {
-    label: "Assigned Tasks",
-    value: "5",
-    icon: ClipboardList,
-    color: "bg-orange-100 text-orange-500",
-  },
-  {
-    label: "Activities",
-    value: "3",
-    icon: Calendar,
-    color: "bg-emerald-100 text-emerald-500",
-  },
-  {
-    label: "Certificates Earned",
-    value: "4",
-    icon: Award,
-    color: "bg-purple-100 text-purple-500",
-  },
-];
+function WelcomeBanner() {
+  const { profile } = useCurrentProfile();
+  const firstName = profile?.name?.split(" ")[0];
 
-// Recent Activity Data
-const recentActivities = [
-  {
-    id: 1,
-    text: "Certificate Issued to Zainab Ali for Community Outreach Drive",
-    time: "2h ago",
-    icon: <Award size={14} className="text-emerald-500" />,
-  },
-  {
-    id: 2,
-    text: 'Activity "Youth Tech Workshop" approved by Head RO',
-    time: "4h ago",
-    icon: <CheckCircle size={14} className="text-emerald-500" />,
-  },
-  {
-    id: 3,
-    text: "Report submitted by Sara Malik for August branch review",
-    time: "5h ago",
-    icon: <Clock size={14} className="text-amber-500" />,
-  },
-  {
-    id: 4,
-    text: "New volunteer Usman Raza added by Youth Leader Zainab Ali",
-    time: "1d ago",
-    icon: <User size={14} className="text-blue-500" />,
-  },
-  {
-    id: 5,
-    text: 'Training video "Leadership Skills 101" uploaded by Head RO',
-    time: "1d ago",
-    icon: <Clock size={14} className="text-amber-500" />,
-  },
-  {
-    id: 6,
-    text: 'Task "Quarterly Review" marked overdue — Bilal Hussain',
-    time: "2d ago",
-    icon: <AlertCircle size={14} className="text-red-500" />,
-  },
-];
+  return (
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div>
+        <h1 className="text-xl font-semibold text-slate-800">Welcome back{firstName ? `, ${firstName}` : ""}!</h1>
+        <p className="mt-1 text-sm text-slate-400">Lead your volunteers, run activities and track your progress.</p>
+      </div>
+      <div className="flex flex-wrap items-center gap-3">
+        <Link
+          href="/youth-leader/tasks?new=1"
+          className="flex items-center gap-1.5 rounded-lg bg-orange-500 px-4 py-2 text-sm font-medium text-white hover:bg-orange-600"
+        >
+          <Plus size={15} />
+          Assign Task
+        </Link>
+        <Link
+          href="/youth-leader/activities"
+          className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
+        >
+          <CalendarPlus size={15} />
+          Activities
+        </Link>
+      </div>
+    </div>
+  );
+}
 
-// Upcoming Activities Data
-const upcomingActivities = [
-  {
-    id: 1,
-    title: "Community Clean-Up Drive",
-    date: "Aug 18, 2025",
-    location: "Cushion Park, Karachi",
-    participants: 34,
-    status: "Approved",
-    statusColor: "bg-emerald-100 text-emerald-600",
-  },
-  {
-    id: 2,
-    title: "Youth Leadership Workshop",
-    date: "Aug 22, 2025",
-    location: "Foundation HQ",
-    participants: 20,
-    status: "Pending",
-    statusColor: "bg-amber-100 text-amber-600",
-  },
-  {
-    id: 3,
-    title: "Volunteer Appreciation Day",
-    date: "Aug 30, 2025",
-    location: "City Hall",
-    participants: 85,
-    status: "Approved",
-    statusColor: "bg-emerald-100 text-emerald-600",
-  },
-];
+function StatCards({ summary }: { summary: YouthLeaderDashboardSummary }) {
+  const { stats, pipeline, certificates } = summary;
+  const cards = [
+    { label: "MY VOLUNTEERS", value: stats.volunteers, sub: "Reporting to you", icon: HandHelping, accent: "bg-orange-100 text-orange-500" },
+    {
+      label: "ACTIVE TASKS",
+      value: stats.activeTasks,
+      sub: stats.overdueTasks > 0 ? `${stats.overdueTasks} overdue` : "None overdue",
+      icon: ListChecks,
+      accent: "bg-blue-100 text-blue-500",
+    },
+    {
+      label: "UPCOMING ACTIVITIES",
+      value: pipeline.upcoming,
+      sub: pipeline.awaitingApproval > 0 ? `${pipeline.awaitingApproval} awaiting approval` : "Approved and scheduled",
+      icon: CalendarDays,
+      accent: "bg-emerald-100 text-emerald-500",
+    },
+    { label: "CERTIFICATES", value: certificates, sub: "Earned so far", icon: Award, accent: "bg-amber-100 text-amber-500" },
+  ];
+
+  return (
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {cards.map((card) => (
+        <div key={card.label} className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
+          <div className={`flex h-9 w-9 items-center justify-center rounded-lg ${card.accent}`}>
+            <card.icon size={17} />
+          </div>
+          <p className="mt-4 text-[11px] font-semibold tracking-wide text-slate-400">{card.label}</p>
+          <p className="mt-1 text-2xl font-semibold text-slate-800">{card.value}</p>
+          <p className="mt-1 text-xs text-slate-400">{card.sub}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 export function DashboardContent() {
+  const { data: summary, isLoading, error, reload } = usePortalData<YouthLeaderDashboardSummary>(
+    "youth-leader",
+    "/api/dashboard/youth-leader",
+    "Unable to load dashboard."
+  );
+
   return (
-    <div className="space-y-6">
-      {/* Page Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">
-          Good morning, Zainab 🌟
-        </h1>
-        <p className="text-sm text-gray-500 mt-1">
-          Manage your volunteers and activities
-        </p>
-      </div>
+    <div className="flex flex-1 flex-col gap-5">
+      <WelcomeBanner />
 
-      {/* Stat Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        {statCards.map((card) => (
-          <div
-            key={card.label}
-            className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm hover:shadow-md transition-shadow"
-          >
-            <div className="flex items-center gap-3">
-              <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${card.color}`}>
-                <card.icon size={18} />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-gray-900">{card.value}</p>
-                <p className="text-xs text-gray-500">{card.label}</p>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
+      {isLoading && !summary && <DashboardSkeleton />}
 
-      {/* Recent Activity and Upcoming Activities */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        {/* Recent Activity */}
-        <div className="rounded-xl border border-gray-100 bg-white shadow-sm overflow-hidden">
-          <div className="px-5 py-4 border-b border-gray-100 bg-gray-50/50">
-            <h2 className="text-sm font-semibold text-gray-700">Recent Activity</h2>
-          </div>
-          <div className="p-5 space-y-4 max-h-[400px] overflow-y-auto">
-            {recentActivities.map((activity) => (
-              <div key={activity.id} className="flex items-start gap-3 pb-4 border-b border-gray-50 last:border-0 last:pb-0">
-                <div className="mt-0.5 flex-shrink-0">
-                  {activity.icon}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm text-gray-700">{activity.text}</p>
-                  <p className="text-xs text-gray-400 mt-0.5">{activity.time}</p>
-                </div>
-              </div>
-            ))}
-          </div>
+      {!isLoading && error && (
+        <div role="alert" className="flex items-center gap-3 text-sm text-red-500">
+          {error}
+          <button type="button" onClick={reload} className="font-medium text-orange-500 hover:underline">
+            Retry
+          </button>
         </div>
+      )}
 
-        {/* Upcoming Activities */}
-        <div className="rounded-xl border border-gray-100 bg-white shadow-sm overflow-hidden">
-          <div className="px-5 py-4 border-b border-gray-100 bg-gray-50/50">
-            <h2 className="text-sm font-semibold text-gray-700">Upcoming Activities</h2>
-          </div>
-          <div className="p-5 space-y-4">
-            {upcomingActivities.map((activity) => (
-              <div
-                key={activity.id}
-                className="rounded-xl border border-gray-100 p-4 hover:shadow-md transition-shadow"
-              >
-                <div className="flex items-start justify-between mb-2">
-                  <h3 className="text-sm font-semibold text-gray-800">
-                    {activity.title}
-                  </h3>
-                  <span
-                    className={`inline-block rounded-full px-2.5 py-1 text-[10px] font-semibold ${activity.statusColor}`}
-                  >
-                    {activity.status}
-                  </span>
-                </div>
-                <div className="space-y-1.5">
-                  <div className="flex items-center gap-2 text-xs text-gray-500">
-                    <Calendar size={12} className="text-gray-400" />
-                    <span>{activity.date}</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-xs text-gray-500">
-                    <MapPin size={12} className="text-gray-400" />
-                    <span>{activity.location}</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-xs text-gray-500">
-                    <Users size={12} className="text-gray-400" />
-                    <span>{activity.participants} participants</span>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
+      {summary && !error && (
+        <div className={`flex flex-col gap-5 transition-opacity ${isLoading ? "opacity-60" : ""}`}>
+          <StatCards summary={summary} />
+          <PendingRequestsBanner requests={summary.memberRequests} href="/youth-leader/volunteers" noun="volunteer" />
 
-      {/* Footer */}
-      <div className="flex items-center justify-between pt-4 border-t border-gray-100">
-        <div className="flex items-center gap-2 text-sm text-gray-600">
-          <span className="font-medium">Zainab Ali</span>
-          <span className="text-gray-400">·</span>
-          <span className="text-gray-400">Youth Leader</span>
+          <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+            <MonthlyPerformance data={summary.monthlyActivity} reportsLabel="My reports submitted" />
+            <RoPerformance
+              ros={summary.leadPerformance}
+              title="Volunteer Performance"
+              emptyText="No volunteers reporting to you yet."
+            />
+          </div>
+
+          <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+            <TaskOverview overview={summary.taskOverview} upcomingTasks={summary.upcomingTasks} basePath="/youth-leader" />
+            <ActivityPipeline activities={summary.pipeline} />
+          </div>
+
+          <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+            <ActivitySummaryPanel
+              activities={summary.activities}
+              eventsHref="/youth-leader/activities"
+              showReview={false}
+              title="Upcoming Activities"
+            />
+            <RecentReports
+              reports={summary.recentReports}
+              basePath="/youth-leader"
+              title="My Recent Reports"
+              emptyText="You haven't submitted a report yet. Send one to your SRO from the Reports page."
+            />
+          </div>
+
+          <RecentNotifications
+            notifications={summary.notifications}
+            unreadCount={summary.unreadNotificationCount}
+            basePath="/youth-leader"
+          />
         </div>
-        <div className="flex items-center gap-2 text-xs text-gray-400">
-          <span>Last updated: Today</span>
-        </div>
-      </div>
+      )}
     </div>
   );
 }

@@ -1,20 +1,8 @@
-"use client";
+import type { Metadata } from "next";
+import { ActivityBoard } from "@/components/shared/activities/ActivityBoard";
 
-import React from "react";
-import Sidebar from "@/components/Sidebar";
-import Topbar from "@/components/Topbar";
-import { ActivityList } from "@/components/Head-of-RO/activities/ActivityList";
+export const metadata: Metadata = { title: "Activities" };
 
 export default function ActivitiesPage() {
-  return (
-    <div className="flex h-screen bg-gray-100 font-sans">
-      <Sidebar />
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <Topbar />
-        <main className="flex-1 overflow-auto p-6">
-          <ActivityList />
-        </main>
-      </div>
-    </div>
-  );
+  return <ActivityBoard portal="head-ro" />;
 }

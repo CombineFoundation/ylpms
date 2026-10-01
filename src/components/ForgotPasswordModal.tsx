@@ -2,7 +2,15 @@
 
 import { useEffect, useState } from "react";
 import { CheckCircle2, Mail, X } from "lucide-react";
-import { useAuth } from "@/contexts/AuthContext";
+import { sendPasswordResetEmail } from "firebase/auth";
+import { getFirebaseAuth } from "@/lib/firebase";
+
+function resetErrorMessage(error: unknown) {
+  const code = typeof error === "object" && error && "code" in error ? String(error.code) : "";
+  if (code === "auth/invalid-email") return "Enter a valid email address.";
+  if (code === "auth/too-many-requests") return "Too many attempts. Please wait a moment and try again.";
+  return "Unable to send the reset email.";
+}
 
 interface ForgotPasswordModalProps {
   isOpen: boolean;
@@ -17,7 +25,6 @@ export default function ForgotPasswordModal({
   const [isSending, setIsSending] = useState(false);
   const [isComplete, setIsComplete] = useState(false);
   const [formError, setFormError] = useState("");
-  const { sendPasswordReset } = useAuth();
 
   useEffect(() => {
     if (isOpen) {
@@ -34,12 +41,11 @@ export default function ForgotPasswordModal({
     setIsSending(true);
 
     try {
-      await sendPasswordReset(email.trim());
+      // Firebase emails a reset link; it doesn't reveal whether the address has an account.
+      await sendPasswordResetEmail(getFirebaseAuth(), email.trim());
       setIsComplete(true);
     } catch (error) {
-      setFormError(
-        error instanceof Error ? error.message : "Unable to send the reset email."
-      );
+      setFormError(resetErrorMessage(error));
     } finally {
       setIsSending(false);
     }

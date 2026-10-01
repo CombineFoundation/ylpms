@@ -1,18 +1,8 @@
-"use client";
-
-import React from "react";
-import Sidebar from "@/components/SRO/Sidebar";
-import { Topbar } from "@/components/SRO/Topbar";
+import type { Metadata } from "next";
 import { DashboardContent } from "@/components/SRO/dashboard/DashboardContent";
 
-export default function Dashboard() {
-  return (
-    <div className="flex min-h-screen w-full bg-slate-50 font-sans">
-      <Sidebar />
-      <div className="flex-1 flex flex-col min-w-0">
-        <Topbar />
-        <DashboardContent />
-      </div>
-    </div>
-  );
+export const metadata: Metadata = { title: "Dashboard" };
+
+export default function DashboardPage() {
+  return <DashboardContent />;
 }

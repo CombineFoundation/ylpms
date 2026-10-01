@@ -1,20 +1,8 @@
-"use client";
+import type { Metadata } from "next";
+import { NotificationList } from "@/components/Head-of-RO/notifications/NotificationList";
 
-import React from "react";
-import Sidebar from "@/components/RO/Sidebar";
-import { Topbar } from "@/components/RO/Topbar";
-import { NotificationList } from "@/components/RO/notifications/NotificationList";
+export const metadata: Metadata = { title: "Notifications" };
 
 export default function NotificationsPage() {
-  return (
-    <div className="flex min-h-screen w-full bg-slate-50 font-sans">
-      <Sidebar />
-      <div className="flex-1 flex flex-col min-w-0">
-        <Topbar />
-        <main className="flex-1 overflow-y-auto p-6 lg:p-8">
-          <NotificationList />
-        </main>
-      </div>
-    </div>
-  );
+  return <NotificationList portalPrefix="/RO/" />;
 }

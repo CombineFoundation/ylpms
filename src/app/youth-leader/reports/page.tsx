@@ -1,8 +1,8 @@
-"use client";
+import type { Metadata } from "next";
+import { TeamReportList } from "@/components/SRO/reports/ReportList";
 
-import React from "react";
-import { ReportList } from "@/components/Youth-Leader/reports/ReportList";
+export const metadata: Metadata = { title: "Reports" };
 
-export default function ReportsPage() {
-  return <ReportList />;
+export default function Page() {
+  return <TeamReportList portal="youth-leader" />;
 }

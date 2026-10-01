@@ -1,37 +1,30 @@
-import { Search, Filter, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
+import { FilterPills, SearchInput } from "../shared/ListParts";
+import { TASK_STATUS_FILTERS, type TaskStatusFilter } from "./task-display.types";
 
 interface TaskToolbarProps {
   searchQuery: string;
   onSearchChange: (value: string) => void;
+  statusFilter: TaskStatusFilter;
+  onStatusFilterChange: (value: TaskStatusFilter) => void;
+  onAdd: () => void;
 }
 
-export function TaskToolbar({ searchQuery, onSearchChange }: TaskToolbarProps) {
+export function TaskToolbar({ searchQuery, onSearchChange, statusFilter, onStatusFilterChange, onAdd }: TaskToolbarProps) {
   return (
-    <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
-      <div className="relative flex-1">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-        <input
-          type="text"
-          value={searchQuery}
-          onChange={(e) => onSearchChange(e.target.value)}
-          placeholder="Search..."
-          className="w-full rounded-lg border border-gray-200 bg-white py-2.5 pl-10 pr-3 text-sm text-gray-700 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#E8622C]/30 focus:border-[#E8622C]"
-        />
+    <div className="space-y-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        <SearchInput value={searchQuery} onChange={onSearchChange} placeholder="Search tasks by title, assignee or priority..." />
+        <button
+          type="button"
+          onClick={onAdd}
+          className="flex items-center justify-center gap-2 rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-dark"
+        >
+          <Plus className="h-4 w-4" />
+          Add New
+        </button>
       </div>
-      <button
-        type="button"
-        className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors"
-      >
-        <Filter className="h-4 w-4" />
-        Filter
-      </button>
-      <button
-        type="button"
-        className="flex items-center gap-2 rounded-lg bg-[#E8622C] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#d9551f] transition-colors"
-      >
-        <Plus className="h-4 w-4" />
-        Add New
-      </button>
+      <FilterPills label="Status" options={TASK_STATUS_FILTERS} value={statusFilter} onChange={onStatusFilterChange} />
     </div>
   );
 }

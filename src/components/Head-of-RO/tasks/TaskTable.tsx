@@ -1,36 +1,42 @@
-import { Clock, Check, Pencil, Trash2 } from "lucide-react";
-
-type Priority = "High" | "Medium" | "Low";
-type Status = "Pending" | "In Progress" | "Done";
-
-type Task = {
-  id: string;
-  task: string;
-  assignee: string;
-  dueDate: string;
-  priority: Priority;
-  status: Status;
-};
-
-const priorityStyles: Record<Priority, string> = {
-  High: "bg-red-100 text-red-500",
-  Medium: "bg-amber-100 text-amber-600",
-  Low: "bg-gray-100 text-gray-400",
-};
-
-const statusStyles: Record<Status, string> = {
-  Pending: "bg-amber-100 text-amber-600",
-  "In Progress": "bg-blue-100 text-blue-600",
-  Done: "bg-emerald-100 text-emerald-600",
-};
+import { Clock, FileCheck, Pencil, Trash2 } from "lucide-react";
+import type { TaskStatus } from "@/types/task.types";
+import { LoadMoreButton, TableMessageRow } from "../shared/ListParts";
+import { priorityLabels, priorityStyles, statusLabels, statusStyles, type TaskRow } from "./task-display.types";
 
 interface TaskTableProps {
-  tasks: Task[];
+  tasks: TaskRow[];
+  isLoading: boolean;
+  error: string | null;
+  emptyMessage: string;
+  hasMore: boolean;
+  isLoadingMore: boolean;
+  updatingId: string | null;
+  onLoadMore: () => void;
+  onStatusChange: (task: TaskRow, status: TaskStatus) => void;
+  onEdit: (task: TaskRow) => void;
+  onDelete: (task: TaskRow) => void;
+  onViewSubmission: (task: TaskRow) => void;
 }
 
-export function TaskTable({ tasks }: TaskTableProps) {
+/** Statuses a Head RO can set directly. "Overdue" is derived from the due date. */
+const SETTABLE_STATUSES: TaskStatus[] = ["assigned", "in-progress", "completed", "cancelled"];
+
+export function TaskTable({
+  tasks,
+  isLoading,
+  error,
+  emptyMessage,
+  hasMore,
+  isLoadingMore,
+  updatingId,
+  onLoadMore,
+  onStatusChange,
+  onEdit,
+  onDelete,
+  onViewSubmission,
+}: TaskTableProps) {
   return (
-    <div className="rounded-xl border border-gray-100 bg-white shadow-sm overflow-hidden">
+    <div className="overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm">
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
@@ -44,71 +50,89 @@ export function TaskTable({ tasks }: TaskTableProps) {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {tasks.map((t) => (
-              <tr key={t.id} className="hover:bg-gray-50/60">
-                <td className="px-6 py-4 font-medium text-gray-900">{t.task}</td>
-                <td className="px-6 py-4 text-gray-600">{t.assignee}</td>
-                <td className="px-6 py-4 text-gray-500">
-                  <span className="flex items-center gap-1.5">
-                    <Clock className="h-3.5 w-3.5 text-gray-400" />
-                    {t.dueDate}
-                  </span>
-                </td>
-                <td className="px-6 py-4">
-                  <span
-                    className={`inline-block rounded-full px-3 py-1 text-xs font-semibold ${priorityStyles[t.priority]}`}
-                  >
-                    {t.priority}
-                  </span>
-                </td>
-                <td className="px-6 py-4">
-                  <span
-                    className={`inline-block rounded-full px-3 py-1 text-xs font-semibold ${statusStyles[t.status]}`}
-                  >
-                    {t.status}
-                  </span>
-                </td>
-                <td className="px-6 py-4">
-                  <div className="flex items-center gap-3">
-                    <button
-                      type="button"
-                      aria-label={`Mark "${t.task}" complete`}
-                      className="text-gray-400 hover:text-emerald-500"
-                    >
-                      <Check className="h-4 w-4" />
-                    </button>
-                    <button
-                      type="button"
-                      aria-label={`Edit "${t.task}"`}
-                      className="text-gray-400 hover:text-gray-600"
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </button>
-                    <button
-                      type="button"
-                      aria-label={`Delete "${t.task}"`}
-                      className="text-gray-400 hover:text-red-500"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
+            {isLoading && <TableMessageRow colSpan={6} message="Loading tasks..." />}
 
-            {tasks.length === 0 && (
-              <tr>
-                <td
-                  colSpan={6}
-                  className="px-6 py-10 text-center text-sm text-gray-400"
-                >
-                  No tasks match your search.
-                </td>
-              </tr>
-            )}
+            {!isLoading && error && <TableMessageRow colSpan={6} message={error} error />}
+
+            {!isLoading &&
+              !error &&
+              tasks.map((t) => (
+                <tr key={t.id} className="hover:bg-gray-50/60">
+                  <td className="px-6 py-4">
+                    <p className="font-medium text-gray-900">{t.title}</p>
+                    <p className="mt-0.5 line-clamp-1 max-w-xs text-xs text-gray-400">{t.description}</p>
+                  </td>
+                  <td className="px-6 py-4 text-gray-600">{t.assigneeName}</td>
+                  <td className={`px-6 py-4 ${t.status === "overdue" ? "text-red-500" : "text-gray-500"}`}>
+                    <span className="flex items-center gap-1.5 whitespace-nowrap">
+                      <Clock className="h-3.5 w-3.5" />
+                      {t.dueDate}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className={`inline-block rounded-full px-3 py-1 text-xs font-semibold ${priorityStyles[t.priority]}`}>
+                      {priorityLabels[t.priority]}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4">
+                    <select
+                      aria-label={`Status of "${t.title}"`}
+                      value={t.status}
+                      disabled={updatingId === t.id}
+                      onChange={(event) => onStatusChange(t, event.target.value as TaskStatus)}
+                      className={`rounded-full border-0 py-1 pl-3 pr-7 text-xs font-semibold disabled:opacity-50 ${statusStyles[t.status]}`}
+                    >
+                      {t.status === "overdue" && <option value="overdue">{statusLabels.overdue}</option>}
+                      {SETTABLE_STATUSES.map((status) => (
+                        <option key={status} value={status}>
+                          {statusLabels[status]}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="flex items-center gap-3">
+                      {t.submission && (
+                        <button
+                          type="button"
+                          onClick={() => onViewSubmission(t)}
+                          aria-label={`View submission for "${t.title}"`}
+                          title="View submission"
+                          className="text-emerald-500 hover:text-emerald-700"
+                        >
+                          <FileCheck className="h-4 w-4" />
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => onEdit(t)}
+                        aria-label={`Edit "${t.title}"`}
+                        title="Edit"
+                        className="text-gray-400 hover:text-gray-600"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onDelete(t)}
+                        aria-label={`Delete "${t.title}"`}
+                        title="Delete"
+                        className="text-gray-400 hover:text-red-500"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+
+            {!isLoading && !error && tasks.length === 0 && <TableMessageRow colSpan={6} message={emptyMessage} />}
           </tbody>
         </table>
       </div>
+      {!isLoading && !error && (
+        <LoadMoreButton hasMore={hasMore} isLoadingMore={isLoadingMore} onClick={onLoadMore} shownCount={tasks.length} />
+      )}
     </div>
   );
 }

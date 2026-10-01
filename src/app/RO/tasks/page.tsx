@@ -1,20 +1,8 @@
-"use client";
+import type { Metadata } from "next";
+import { TeamTasksContent } from "@/components/SRO/tasks/SroTasksContent";
 
-import React from "react";
-import Sidebar from "@/components/RO/Sidebar";
-import { Topbar } from "@/components/RO/Topbar";
-import { TaskList } from "@/components/RO/tasks/TaskList";
+export const metadata: Metadata = { title: "Tasks" };
 
 export default function TasksPage() {
-  return (
-    <div className="flex min-h-screen w-full bg-slate-50 font-sans">
-      <Sidebar />
-      <div className="flex-1 flex flex-col min-w-0">
-        <Topbar />
-        <main className="flex-1 overflow-y-auto p-6 lg:p-8">
-          <TaskList />
-        </main>
-      </div>
-    </div>
-  );
+  return <TeamTasksContent portal="ro" />;
 }

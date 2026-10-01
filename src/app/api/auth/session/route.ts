@@ -1,35 +1,40 @@
-import { NextResponse } from "next/server";
-import { getFirebaseAdminAuth } from "@/lib/firebase-admin";
-import { SESSION_COOKIE_NAME } from "@/lib/server-auth";
+import { withAuth } from "@/middleware/auth.middleware";
+import { getUserById } from "@/services/user.service";
+import { updateDoc } from "@/utils/firestore";
+import { apiError, apiSuccess } from "@/utils/api-response";
+import { AuthenticationError, logger } from "@/utils/errors";
 
-const SESSION_DURATION_MS = 1000 * 60 * 60 * 24 * 5;
-const sessionCookieOptions = {
-  httpOnly: true,
-  secure: process.env.NODE_ENV === "production",
-  sameSite: "lax" as const,
-  path: "/",
-  maxAge: SESSION_DURATION_MS / 1000,
-};
-
-export async function POST(request: Request) {
+/**
+ * POST /api/auth/session - Called right after client-side sign-in.
+ *
+ * withAuth has already rejected inactive/suspended accounts (403), so reaching
+ * here means the user may sign in. Records the login and promotes a first-time
+ * "pending" user to "active", then returns the role the client should route to.
+ */
+export const POST = withAuth(async (req) => {
   try {
-    const { idToken } = (await request.json()) as { idToken?: unknown };
-    if (typeof idToken !== "string" || !idToken) {
-      return NextResponse.json({ error: "Missing ID token." }, { status: 400 });
-    }
-    const sessionCookie = await getFirebaseAdminAuth().createSessionCookie(idToken, {
-      expiresIn: SESSION_DURATION_MS,
-    });
-    const response = NextResponse.json({ ok: true });
-    response.cookies.set(SESSION_COOKIE_NAME, sessionCookie, sessionCookieOptions);
-    return response;
-  } catch {
-    return NextResponse.json({ error: "Unable to create session." }, { status: 401 });
-  }
-}
+    if (!req.user) throw new AuthenticationError();
 
-export async function DELETE() {
-  const response = NextResponse.json({ ok: true });
-  response.cookies.set(SESSION_COOKIE_NAME, "", { ...sessionCookieOptions, maxAge: 0 });
-  return response;
-}
+    const user = await getUserById(req.user.userId);
+
+    if (user) {
+      try {
+        await updateDoc("users", user.id, {
+          lastLoginAt: new Date(),
+          ...(user.status === "pending" || !user.status ? { status: "active" } : {}),
+        });
+      } catch (error) {
+        logger.warn(`Unable to record login for ${user.id}`, error);
+      }
+    }
+
+    return apiSuccess({
+      userId: req.user.userId,
+      role: req.user.role,
+      name: user?.name || "",
+      email: req.user.email,
+    });
+  } catch (error) {
+    return apiError(error);
+  }
+});
