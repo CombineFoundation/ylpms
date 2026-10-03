@@ -65,7 +65,7 @@ function CertificatesView({ portal, loaded }: { portal: TeamPortal; loaded: Load
     if (!q) return groups;
     return groups.filter((group) =>
       [group.eventTitle, group.eventLocation, ...group.certificates.flatMap((c) => [c.recipientName, c.certificateNumber])].some(
-        (value) => value.toLowerCase().includes(q)
+        (value) => value?.toLowerCase().includes(q)
       )
     );
   }, [groups, search]);

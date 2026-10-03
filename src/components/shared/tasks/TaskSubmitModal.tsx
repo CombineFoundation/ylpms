@@ -27,7 +27,7 @@ type TaskSubmitModalProps = {
   onSubmitted: (taskId: string, status: TaskStatus) => void;
 };
 
-/** The assignee hands in their work (a note and optional PDFs), which completes the task. */
+/** The assignee hands in their work (a note and optional PDFs) for the assigner to review. */
 export function TaskSubmitModal({ task, portal, selectedId, onClose, onSubmitted }: TaskSubmitModalProps) {
   const [files, setFiles] = useState<File[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -73,7 +73,11 @@ export function TaskSubmitModal({ task, portal, selectedId, onClose, onSubmitted
     <Modal
       isOpen={!!task}
       title={task ? `Submit “${task.title}”` : "Submit task"}
-      description={task ? `${task.assignerName} is notified and can review what you hand in. This marks the task as done.` : undefined}
+      description={
+        task
+          ? `${task.assignerName} reviews what you hand in, then accepts it or asks for changes. The task is done once it's accepted.`
+          : undefined
+      }
       onClose={onClose}
       isBusy={isSubmitting}
       size="lg"
@@ -111,7 +115,7 @@ export function TaskSubmitModal({ task, portal, selectedId, onClose, onSubmitted
             disabled={isSubmitting}
             className="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {isSubmitting ? "Submitting..." : "Submit & complete"}
+            {isSubmitting ? "Submitting..." : "Submit for review"}
           </button>
         </div>
       </form>

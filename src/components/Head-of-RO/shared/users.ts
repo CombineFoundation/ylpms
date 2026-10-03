@@ -44,7 +44,7 @@ export function toUserRow(user: ApiUser): UserRow {
   return {
     id: user.id,
     email: user.email || "",
-    name: user.name,
+    name: user.name || "",
     memberId: user.memberId || "",
     university: user.university || "",
     role: user.role,
@@ -63,7 +63,7 @@ export function matchesQuery(row: UserRow, query: string) {
   const q = query.trim().toLowerCase();
   if (!q) return true;
   return [row.name, row.email, row.memberId, row.university, row.regionLabel, row.reportingToName, row.status].some((value) =>
-    value.toLowerCase().includes(q)
+    value?.toLowerCase().includes(q)
   );
 }
 

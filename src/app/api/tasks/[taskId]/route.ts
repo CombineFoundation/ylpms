@@ -54,6 +54,21 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
       const validatedData = updateTaskSchema.parse(await req.json());
 
+      // The assignee only tracks progress: finishing goes through submit + review.
+      const isAssigneeOnly =
+        authReq.user.userId === task.assignedTo &&
+        authReq.user.userId !== task.assignedBy &&
+        authReq.user.role !== "head-ro" &&
+        authReq.user.role !== "developer";
+      if (isAssigneeOnly && validatedData.status && validatedData.status !== task.status) {
+        if (task.status === "submitted" || task.status === "completed") {
+          throw new AuthorizationError("This task is with your reviewer; you can't change its status");
+        }
+        if (validatedData.status !== "assigned" && validatedData.status !== "in-progress") {
+          throw new AuthorizationError("Submit your work to finish this task; whoever assigned it reviews it");
+        }
+      }
+
       // Reassigning is a manager action: the assignee can't hand their task
       // off, and the new assignee must be someone the caller manages.
       if (validatedData.assignedTo && validatedData.assignedTo !== task.assignedTo) {

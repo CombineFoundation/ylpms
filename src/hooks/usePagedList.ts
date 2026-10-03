@@ -68,3 +68,34 @@ export function usePagedList<T>(
     reload: () => load(1),
   };
 }
+
+/** Upper bound on rows fetched just to search (pages × page size). */
+const SEARCH_ROW_LIMIT = 2000;
+
+/**
+ * Lists search on the client, so a search would only see the pages loaded so
+ * far. While `query` is non-empty this keeps loading pages (up to
+ * SEARCH_ROW_LIMIT rows) so the search covers the whole list.
+ */
+export function useLoadAllWhileSearching(
+  list: {
+    items: readonly unknown[];
+    hasMore: boolean;
+    isLoading: boolean;
+    isLoadingMore: boolean;
+    error: string | null;
+    loadMore: () => void;
+  },
+  query: string
+) {
+  const { hasMore, isLoading, isLoadingMore, error, items, loadMore } = list;
+  const isSearching = query.trim().length > 0;
+  const loadMoreRef = useRef(loadMore);
+  loadMoreRef.current = loadMore;
+
+  useEffect(() => {
+    if (isSearching && hasMore && !isLoading && !isLoadingMore && !error && items.length < SEARCH_ROW_LIMIT) {
+      loadMoreRef.current();
+    }
+  }, [isSearching, hasMore, isLoading, isLoadingMore, error, items.length]);
+}

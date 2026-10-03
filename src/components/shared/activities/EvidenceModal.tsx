@@ -149,7 +149,7 @@ export function EvidenceModal({ activity, scope, onClose, onSubmitted }: Evidenc
             <>
               {(detail.candidateList?.length ?? 0) > 8 && (
                 <div className="mt-2">
-                  <SearchInput value={search} onChange={setSearch} placeholder="Search participants..." />
+                  <SearchInput value={search} onChange={setSearch} placeholder="Search participants by name..." />
                 </div>
               )}
               <ul className="mt-2 max-h-56 divide-y divide-gray-50 overflow-y-auto rounded-lg border border-gray-100">

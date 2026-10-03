@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { apiFetch, errorMessage } from "@/lib/api-client";
-import { usePagedList } from "@/hooks/usePagedList";
+import { useLoadAllWhileSearching, usePagedList } from "@/hooks/usePagedList";
 import { RoTable } from "./RoTable";
 import { RoFormModal } from "./RoFormModal";
 import type { Ro, RoForm } from "./ro.types";
@@ -21,6 +21,8 @@ export function RoList() {
   const ros = useMemo(() => list.items.map(toUserRow), [list.items]);
 
   const [query, setQuery] = useState("");
+  // Search runs on the client, so fetch the remaining pages while searching.
+  useLoadAllWhileSearching(list, query);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("All");
   const [regionFilter, setRegionFilter] = useState("");
 

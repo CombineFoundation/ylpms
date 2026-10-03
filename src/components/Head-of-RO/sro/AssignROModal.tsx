@@ -65,7 +65,7 @@ export function AssignROModal({ isOpen, sro, onClose, onChanged }: AssignROModal
     return ros
       .filter((ro) => ro.reportingToId !== sro?.id)
       .filter((ro) => ro.status !== "inactive" && ro.status !== "suspended")
-      .filter((ro) => !q || [ro.name, ro.email, ro.region || "", ro.reportingToName || ""].some((v) => v.toLowerCase().includes(q)));
+      .filter((ro) => !q || [ro.name, ro.email, ro.region, ro.reportingToName].some((v) => v?.toLowerCase().includes(q)));
   }, [ros, sro, query]);
 
   const movingCount = candidates.filter((ro) => selectedIds.includes(ro.id) && ro.reportingToId).length;
@@ -153,7 +153,7 @@ export function AssignROModal({ isOpen, sro, onClose, onChanged }: AssignROModal
               <div className="mt-2 max-h-[40vh] space-y-2 overflow-y-auto">
                 {candidates.length === 0 ? (
                   <p className="py-6 text-center text-sm text-gray-400">
-                    {query ? "No ROs match your search." : "No other active ROs to add."}
+                    {query.trim() ? "No ROs match your search." : "No other active ROs to add."}
                   </p>
                 ) : (
                   candidates.map((ro) => (

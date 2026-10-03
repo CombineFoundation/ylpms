@@ -116,10 +116,13 @@ function countTasks(tasks: TaskRow[], now: Date): Map<string, TaskCounts> {
     counts.assigned += 1;
     if (task.status === "completed") {
       counts.completed += 1;
+    } else if (task.status === "submitted") {
+      // Work handed in for review isn't late, whatever the due date.
+      counts.inProgress += 1;
     } else {
       const due = toDate(task.dueDate);
       if (task.status === "overdue" || (due && due < now)) counts.overdue += 1;
-      else if (task.status === "in-progress") counts.inProgress += 1;
+      else if (task.status === "in-progress" || task.status === "changes-requested") counts.inProgress += 1;
     }
     byUser.set(task.assignedTo, counts);
   });

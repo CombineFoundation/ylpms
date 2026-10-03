@@ -7,6 +7,7 @@ import {
   statusLabels,
   statusStyles,
 } from "@/components/Head-of-RO/tasks/task-display.types";
+import { ReviewButton } from "@/components/Head-of-RO/tasks/TaskTable";
 import type { SroTaskRow } from "./sro-task.types";
 
 type SroTaskTableProps = {
@@ -26,11 +27,17 @@ type SroTaskTableProps = {
   onViewSubmission?: (task: SroTaskRow) => void;
 };
 
-/** "Overdue" is derived from the due date, so it's never set directly. Assignees can't cancel. */
+/**
+ * "Overdue" is derived from the due date, so it's never set directly. Assignees
+ * only track progress: they finish by submitting, and the assigner reviews it.
+ */
 const SETTABLE_STATUSES: Record<SroTaskTableProps["mode"], TaskStatus[]> = {
-  mine: ["assigned", "in-progress", "completed"],
+  mine: ["assigned", "in-progress"],
   team: ["assigned", "in-progress", "completed", "cancelled"],
 };
+
+/** An assignee can't change these: the task is with its reviewer, or finished. */
+const LOCKED_FOR_ASSIGNEE: TaskStatus[] = ["submitted", "completed", "cancelled"];
 
 export function SroTaskTable({
   mode,
@@ -71,6 +78,11 @@ export function SroTaskTable({
                 <td className="px-5 py-3.5">
                   <p className="font-medium text-gray-900">{t.title}</p>
                   <p className="mt-0.5 line-clamp-1 max-w-xs text-xs text-gray-400">{t.description}</p>
+                  {t.status === "changes-requested" && t.review?.note && (
+                    <p className="mt-1 line-clamp-2 max-w-xs text-xs text-orange-600">
+                      <span className="font-semibold">Changes requested:</span> {t.review.note}
+                    </p>
+                  )}
                   {t.eventTitle && (
                     <span className="mt-1 inline-flex max-w-xs items-center gap-1 truncate rounded-full bg-orange-50 px-2 py-0.5 text-[11px] font-medium text-orange-600">
                       <CalendarDays className="h-3 w-3 shrink-0" />
@@ -93,32 +105,38 @@ export function SroTaskTable({
                   </span>
                 </td>
                 <td className="px-4 py-3.5">
-                  <select
-                    aria-label={`Status of "${t.title}"`}
-                    value={t.status}
-                    disabled={updatingId === t.id}
-                    onChange={(event) => onStatusChange(t, event.target.value as TaskStatus)}
-                    className={`rounded-full border-0 py-1 pl-3 pr-7 text-xs font-semibold disabled:opacity-50 ${statusStyles[t.status]}`}
-                  >
-                    {!SETTABLE_STATUSES[mode].includes(t.status) && <option value={t.status}>{statusLabels[t.status]}</option>}
-                    {SETTABLE_STATUSES[mode].map((status) => (
-                      <option key={status} value={status}>
-                        {statusLabels[status]}
-                      </option>
-                    ))}
-                  </select>
+                  {mode === "mine" && LOCKED_FOR_ASSIGNEE.includes(t.status) ? (
+                    <span className={`inline-block whitespace-nowrap rounded-full px-3 py-1 text-xs font-semibold ${statusStyles[t.status]}`}>
+                      {statusLabels[t.status]}
+                    </span>
+                  ) : (
+                    <select
+                      aria-label={`Status of "${t.title}"`}
+                      value={t.status}
+                      disabled={updatingId === t.id}
+                      onChange={(event) => onStatusChange(t, event.target.value as TaskStatus)}
+                      className={`rounded-full border-0 py-1 pl-3 pr-7 text-xs font-semibold disabled:opacity-50 ${statusStyles[t.status]}`}
+                    >
+                      {!SETTABLE_STATUSES[mode].includes(t.status) && <option value={t.status}>{statusLabels[t.status]}</option>}
+                      {SETTABLE_STATUSES[mode].map((status) => (
+                        <option key={status} value={status}>
+                          {statusLabels[status]}
+                        </option>
+                      ))}
+                    </select>
+                  )}
                 </td>
                 {mode === "mine" && (
                   <td className="px-4 py-3.5">
                     <div className="flex items-center gap-2">
-                      {t.status !== "completed" && t.status !== "cancelled" && onSubmit && (
+                      {!LOCKED_FOR_ASSIGNEE.includes(t.status) && onSubmit && (
                         <button
                           type="button"
                           onClick={() => onSubmit(t)}
                           disabled={updatingId === t.id}
                           className="flex items-center gap-1 whitespace-nowrap rounded-md bg-brand px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-dark disabled:opacity-50"
                         >
-                          <Upload className="h-3.5 w-3.5" /> Submit
+                          <Upload className="h-3.5 w-3.5" /> {t.status === "changes-requested" ? "Resubmit" : "Submit"}
                         </button>
                       )}
                       {t.submission && onViewSubmission && (
@@ -136,7 +154,10 @@ export function SroTaskTable({
                 {mode === "team" && (
                   <td className="px-4 py-3.5">
                     <div className="flex items-center gap-3">
-                      {t.submission && onViewSubmission && (
+                      {t.status === "submitted" && onViewSubmission && (
+                        <ReviewButton onClick={() => onViewSubmission(t)} />
+                      )}
+                      {t.submission && t.status !== "submitted" && onViewSubmission && (
                         <button
                           type="button"
                           onClick={() => onViewSubmission(t)}

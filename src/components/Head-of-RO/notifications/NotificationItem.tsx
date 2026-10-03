@@ -19,6 +19,7 @@ export type NotificationRow = {
 const iconByType: Record<NotificationType, typeof Bell> = {
   "task-assigned": CheckCircle2,
   "task-completed": CheckCircle2,
+  "task-reviewed": CheckCircle2,
   "report-submitted": FileText,
   "user-added": UserPlus,
   "event-created": Calendar,
