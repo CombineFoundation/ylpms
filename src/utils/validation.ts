@@ -187,11 +187,20 @@ export const eventWorkflowSchema = z.discriminatedUnion("action", [
 
 export const eventAttendanceSchema = z.object({ action: z.enum(["join", "leave"]) });
 
-/** The assignee hands in their work (marks the task completed). */
+/** The assignee hands in their work (sent to the assigner for review). */
 export const submitTaskSchema = z.object({
   note: z.string().trim().min(5, "Describe what you did in at least 5 characters").max(3000),
   attachments: z.array(attachmentSchema).max(5, "Attach at most 5 PDFs").default([]),
 });
+
+/** The assigner accepts submitted work or sends it back with feedback. */
+export const reviewTaskSchema = z.discriminatedUnion("decision", [
+  z.object({ decision: z.literal("accept"), note: z.string().trim().max(1000).optional() }),
+  z.object({
+    decision: z.literal("request-changes"),
+    note: z.string().trim().min(3, "Say what needs to change").max(1000),
+  }),
+]);
 
 // Report validation schemas
 export const createReportSchema = z.object({

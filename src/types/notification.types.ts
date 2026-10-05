@@ -2,8 +2,9 @@ import { Timestamp } from "firebase/firestore";
 
 export type NotificationType = 
   | "task-assigned" 
-  | "task-completed" 
-  | "report-submitted" 
+  | "task-completed"
+  | "task-reviewed"
+  | "report-submitted"
   | "user-added" 
   | "event-created"
   | "event-updated"

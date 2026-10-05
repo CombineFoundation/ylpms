@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { usePagedList } from "@/hooks/usePagedList";
+import { useLoadAllWhileSearching, usePagedList } from "@/hooks/usePagedList";
 import { TrainingGrid } from "@/components/Head-of-RO/training/TrainingGrid";
 import { TYPE_FILTERS, type ApiTrainingResource, type TypeFilter } from "@/components/Head-of-RO/training/training.types";
 import { FilterPills, PageHeader, SearchInput, emptyMessage } from "@/components/Head-of-RO/shared/ListParts";
@@ -20,6 +20,8 @@ export function TrainingLibrary() {
     "Unable to load training resources."
   );
   const [query, setQuery] = useState("");
+  // Search runs on the client, so fetch the remaining pages while searching.
+  useLoadAllWhileSearching(list, query);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();

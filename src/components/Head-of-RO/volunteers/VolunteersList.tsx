@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { usePagedList } from "@/hooks/usePagedList";
+import { useLoadAllWhileSearching, usePagedList } from "@/hooks/usePagedList";
 import { VolunteersTable } from "./VolunteersTable";
 import { PageHeader, emptyMessage } from "../shared/ListParts";
 import { UserToolbar } from "../shared/UserToolbar";
@@ -23,6 +23,8 @@ export function VolunteersList() {
   const volunteers = useMemo(() => list.items.map(toUserRow), [list.items]);
 
   const [query, setQuery] = useState("");
+  // Search runs on the client, so fetch the remaining pages while searching.
+  useLoadAllWhileSearching(list, query);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("All");
   const [regionFilter, setRegionFilter] = useState("");
   const [viewing, setViewing] = useState<UserRow | null>(null);

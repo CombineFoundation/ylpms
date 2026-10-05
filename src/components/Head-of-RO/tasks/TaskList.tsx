@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { apiFetch, errorMessage } from "@/lib/api-client";
-import { usePagedList } from "@/hooks/usePagedList";
+import { useLoadAllWhileSearching, usePagedList } from "@/hooks/usePagedList";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import type { TaskStatus } from "@/types/task.types";
 import { TaskToolbar } from "./TaskToolbar";
@@ -30,6 +30,8 @@ export function TaskList() {
   const tasks = useMemo(() => list.items.map(toTaskRow), [list.items]);
 
   const [query, setQuery] = useState("");
+  // Search runs on the client, so fetch the remaining pages while searching.
+  useLoadAllWhileSearching(list, query);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<TaskRow | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
@@ -44,7 +46,7 @@ export function TaskList() {
     const q = query.trim().toLowerCase();
     if (!q) return tasks;
     return tasks.filter((t) =>
-      [t.title, t.description, t.assigneeName, t.priority].some((value) => value.toLowerCase().includes(q))
+      [t.title, t.description, t.assigneeName, t.priority].some((value) => value?.toLowerCase().includes(q))
     );
   }, [tasks, query]);
 
@@ -161,7 +163,15 @@ export function TaskList() {
         onDelete={setDeletingTask}
         onViewSubmission={setViewingSubmission}
       />
-      <TaskSubmissionModal task={viewingSubmission} onClose={() => setViewingSubmission(null)} />
+      <TaskSubmissionModal
+        task={viewingSubmission}
+        canReview
+        onClose={() => setViewingSubmission(null)}
+        onReviewed={() => {
+          setViewingSubmission(null);
+          list.reload();
+        }}
+      />
       <TaskFormModal
         isOpen={isModalOpen}
         editingTask={editingTask}

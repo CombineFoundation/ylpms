@@ -9,7 +9,16 @@ import { createTaskSchema } from "@/utils/validation";
 import { apiError, apiSuccess, parsePagination } from "@/utils/api-response";
 import { TaskStatus } from "@/types/task.types";
 
-const STATUS_FILTERS = ["assigned", "in-progress", "completed", "overdue", "cancelled", "open"] as const;
+const STATUS_FILTERS = [
+  "assigned",
+  "in-progress",
+  "submitted",
+  "changes-requested",
+  "completed",
+  "overdue",
+  "cancelled",
+  "open",
+] as const;
 
 /**
  * GET /api/tasks - One page of tasks (with assignee names), ordered by due date

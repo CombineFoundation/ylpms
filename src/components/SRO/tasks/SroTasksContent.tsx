@@ -23,6 +23,7 @@ import { toSroTaskRow, type SroTaskForm, type SroTaskRow, type SroTasksResponse 
 
 const VIEW_FILTERS = [
   { value: "open", label: "Open" },
+  { value: "submitted", label: "In Review" },
   { value: "overdue", label: "Overdue" },
   { value: "completed", label: "Done" },
   { value: "all", label: "All" },
@@ -39,7 +40,7 @@ const pageCopy: Record<ScopedRole, string> = {
   sro: "Tasks assigned to you by the Head RO, and tasks you assign to your team.",
   ro: "Tasks assigned to you by your SRO, and tasks you assign to your youth leaders and volunteers.",
   "youth-leader": "Tasks assigned to you by your RO, and tasks you assign to your volunteers.",
-  volunteer: "Tasks assigned to you. Update the status as you make progress.",
+  volunteer: "Tasks assigned to you. Update the status as you go, then submit your work for review.",
 };
 
 /**
@@ -79,7 +80,7 @@ export function TeamTasksContent({ portal }: { portal: ScopedRole }) {
       return rows.filter(
         (t) =>
           matchesView(t, view) &&
-          (!q || [t.title, t.description, t.assigneeName, t.assignerName].some((value) => value.toLowerCase().includes(q)))
+          (!q || [t.title, t.description, t.assigneeName, t.assignerName].some((value) => value?.toLowerCase().includes(q)))
       );
     },
     [query, view]
@@ -243,7 +244,16 @@ export function TeamTasksContent({ portal }: { portal: ScopedRole }) {
           load();
         }}
       />
-      <TaskSubmissionModal task={viewingSubmission} onClose={() => setViewingSubmission(null)} />
+      <TaskSubmissionModal
+        task={viewingSubmission}
+        // Only the assigner reviews: tasks in "Assigned by me".
+        canReview={!!viewingSubmission && !!data?.assignedByMe.some((t) => t.id === viewingSubmission.id)}
+        onClose={() => setViewingSubmission(null)}
+        onReviewed={() => {
+          setViewingSubmission(null);
+          load();
+        }}
+      />
 
       <SroTaskFormModal
         isOpen={isModalOpen}

@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { Download } from "lucide-react";
 import { getAuthToken, errorMessage } from "@/lib/api-client";
-import { usePagedList } from "@/hooks/usePagedList";
+import { useLoadAllWhileSearching, usePagedList } from "@/hooks/usePagedList";
 import { ReportsTable } from "./ReportsTable";
 import { ReportDetailModal } from "./ReportDetailModal";
 import { useReportReview } from "./useReportReview";
@@ -25,6 +25,8 @@ export function ReportList() {
   const reports = useMemo(() => list.items.map(toDisplayReport), [list.items]);
 
   const [search, setSearch] = useState("");
+  // Search runs on the client, so fetch the remaining pages while searching.
+  useLoadAllWhileSearching(list, search);
   const [viewingId, setViewingId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
@@ -42,7 +44,7 @@ export function ReportList() {
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return reports;
-    return reports.filter((r) => [r.title, r.submittedBy, r.region].some((value) => value.toLowerCase().includes(q)));
+    return reports.filter((r) => [r.title, r.submittedBy, r.region].some((value) => value?.toLowerCase().includes(q)));
   }, [reports, search]);
 
   const exportCsv = async () => {
@@ -83,7 +85,7 @@ export function ReportList() {
       <div className="overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm">
         <div className="flex flex-col gap-3 border-b border-gray-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="sm:w-80">
-            <SearchInput value={search} onChange={setSearch} placeholder="Search reports..." />
+            <SearchInput value={search} onChange={setSearch} placeholder="Search by title, submitter or region..." />
           </div>
           <button
             type="button"
@@ -100,7 +102,11 @@ export function ReportList() {
           reports={filtered}
           isLoading={list.isLoading}
           error={list.error}
-          emptyMessage={emptyMessage({ isFiltered: !!search.trim(), noun: statusFilter === "submitted" ? "pending reports" : "reports" })}
+          emptyMessage={emptyMessage({
+            // "Pending" has its own noun; any other status pill is a filter.
+            isFiltered: !!search.trim() || (!!statusFilter && statusFilter !== "submitted"),
+            noun: statusFilter === "submitted" ? "pending reports" : "reports",
+          })}
           reviewingId={review.reviewingId}
           hasMore={list.hasMore}
           isLoadingMore={list.isLoadingMore}

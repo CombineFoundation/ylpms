@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { TaskPriority, TaskStatus } from "@/types/task.types";
+import type { TaskPriority, TaskReviewDecision, TaskStatus } from "@/types/task.types";
 import type { ReportAttachment } from "@/types/report.types";
 import type { UserRole } from "@/types/user.types";
 import type { TimestampInput } from "@/utils/user-status";
@@ -17,6 +17,7 @@ export type ApiTask = {
   priority: TaskPriority;
   status: TaskStatus;
   submission?: ApiTaskSubmission;
+  review?: ApiTaskReview;
   /** The activity this task is for, if the assigner linked one. */
   eventId?: string;
   eventTitle?: string;
@@ -27,6 +28,13 @@ export type ApiTaskSubmission = {
   note: string;
   attachments: ReportAttachment[];
   submittedAt: TimestampInput;
+};
+
+/** The assigner's latest decision on the submission (timestamps serialized). */
+export type ApiTaskReview = {
+  decision: TaskReviewDecision;
+  note?: string;
+  reviewedAt: TimestampInput;
 };
 
 export type TaskRow = {
@@ -41,6 +49,7 @@ export type TaskRow = {
   priority: TaskPriority;
   status: TaskStatus;
   submission?: ApiTaskSubmission;
+  review?: ApiTaskReview;
   eventId?: string;
   eventTitle?: string;
 };
@@ -58,6 +67,7 @@ export function toTaskRow(task: ApiTask): TaskRow {
     priority: task.priority,
     status: task.status,
     submission: task.submission,
+    review: task.review,
     eventId: task.eventId,
     eventTitle: task.eventTitle,
   };
@@ -80,6 +90,8 @@ export const priorityStyles: Record<TaskPriority, string> = {
 export const statusLabels: Record<TaskStatus, string> = {
   assigned: "Assigned",
   "in-progress": "In Progress",
+  submitted: "In Review",
+  "changes-requested": "Changes Requested",
   completed: "Done",
   overdue: "Overdue",
   cancelled: "Cancelled",
@@ -88,6 +100,8 @@ export const statusLabels: Record<TaskStatus, string> = {
 export const statusStyles: Record<TaskStatus, string> = {
   assigned: "bg-amber-100 text-amber-600",
   "in-progress": "bg-blue-100 text-blue-600",
+  submitted: "bg-violet-100 text-violet-600",
+  "changes-requested": "bg-orange-100 text-orange-600",
   completed: "bg-emerald-100 text-emerald-600",
   overdue: "bg-red-100 text-red-500",
   cancelled: "bg-gray-100 text-gray-400",
@@ -96,6 +110,8 @@ export const statusStyles: Record<TaskStatus, string> = {
 export const TASK_STATUS_FILTERS = [
   { value: "", label: "All" },
   { value: "open", label: "Open" },
+  { value: "submitted", label: "In Review" },
+  { value: "changes-requested", label: "Changes Requested" },
   { value: "overdue", label: "Overdue" },
   { value: "assigned", label: "Assigned" },
   { value: "in-progress", label: "In Progress" },

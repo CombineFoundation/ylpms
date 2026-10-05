@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { Plus } from "lucide-react";
 import { apiFetch, errorMessage } from "@/lib/api-client";
-import { usePagedList } from "@/hooks/usePagedList";
+import { useLoadAllWhileSearching, usePagedList } from "@/hooks/usePagedList";
 import { uploadTrainingFile } from "@/lib/training-files";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { TrainingFormModal } from "./TrainingFormModal";
@@ -39,6 +39,8 @@ export function TrainingList({ authorId }: TrainingListProps = {}) {
   const canManage = (resource: ApiTrainingResource) => !authorId || resource.authorId === authorId;
 
   const [query, setQuery] = useState("");
+  // Search runs on the client, so fetch the remaining pages while searching.
+  useLoadAllWhileSearching(list, query);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editing, setEditing] = useState<ApiTrainingResource | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
@@ -51,7 +53,9 @@ export function TrainingList({ authorId }: TrainingListProps = {}) {
     const q = query.trim().toLowerCase();
     if (!q) return list.items;
     return list.items.filter((resource) =>
-      [resource.title, resource.description, resource.category].some((value) => value.toLowerCase().includes(q))
+      [resource.title, resource.description, resource.category, resource.authorName].some((value) =>
+        value?.toLowerCase().includes(q)
+      )
     );
   }, [list.items, query]);
 

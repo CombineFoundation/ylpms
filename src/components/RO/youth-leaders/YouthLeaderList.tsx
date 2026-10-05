@@ -40,7 +40,9 @@ export function YouthLeaderList() {
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return rows;
-    return rows.filter((row) => [row.name, row.email, row.regionLabel, row.status].some((v) => v.toLowerCase().includes(q)));
+    return rows.filter((row) =>
+      [row.name, row.email, row.memberId, row.university, row.regionLabel, row.status].some((v) => v?.toLowerCase().includes(q))
+    );
   }, [rows, search]);
 
   // Approved requests already show up as youth leaders.
@@ -123,7 +125,7 @@ export function YouthLeaderList() {
 
       <section className="overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm">
         <div className="border-b border-gray-100 px-5 py-4 sm:w-96">
-          <SearchInput value={search} onChange={setSearch} placeholder="Search youth leaders..." />
+          <SearchInput value={search} onChange={setSearch} placeholder="Search by name, email, program ID or city..." />
         </div>
         <YouthLeaderTable
           leaders={filtered}

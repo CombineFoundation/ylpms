@@ -271,8 +271,10 @@ async function getTeamDashboardSummary(sroId: string, leadRole: UserRole): Promi
     teamTasks.forEach((task) => {
       const due = toDate(task.dueDate);
       if (task.status === "completed") taskOverview.completed += 1;
+      // Work handed in for review isn't late, whatever the due date.
+      else if (task.status === "submitted") taskOverview.inProgress += 1;
       else if (task.status === "overdue" || (due && due < now)) taskOverview.overdue += 1;
-      else if (task.status === "in-progress") taskOverview.inProgress += 1;
+      else if (task.status === "in-progress" || task.status === "changes-requested") taskOverview.inProgress += 1;
       else taskOverview.pending += 1;
     });
 

@@ -41,7 +41,7 @@ export function TeamReports({ portal = "sro" }: { portal?: ScopedRole }) {
     return reports
       .filter((r) => !statusFilter || r.status === statusFilter)
       .map(toDisplayReport)
-      .filter((r) => !q || [r.title, r.submittedBy, r.region].some((value) => value.toLowerCase().includes(q)));
+      .filter((r) => !q || [r.title, r.submittedBy, r.region].some((value) => value?.toLowerCase().includes(q)));
   }, [reports, statusFilter, search]);
 
   const filterOptions = REPORT_STATUS_FILTERS.map((option) => ({
@@ -63,7 +63,7 @@ export function TeamReports({ portal = "sro" }: { portal?: ScopedRole }) {
           isLoading={isLoading}
           error={loadError}
           emptyMessage={emptyMessage({
-            isFiltered: !!search.trim(),
+            isFiltered: !!search.trim() || (!!statusFilter && statusFilter !== "submitted"),
             noun: statusFilter === "submitted" ? "pending reports" : "reports",
           })}
           reviewingId={review.reviewingId}

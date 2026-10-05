@@ -1,11 +1,17 @@
 import { Timestamp } from "firebase/firestore";
 import type { ReportAttachment } from "./report.types";
 
-export type TaskStatus = 
-  | "assigned" 
-  | "in-progress" 
-  | "completed" 
-  | "overdue" 
+/**
+ * "submitted": the assignee handed in work and the assigner must review it.
+ * "changes-requested": the assigner sent it back; the assignee resubmits.
+ */
+export type TaskStatus =
+  | "assigned"
+  | "in-progress"
+  | "submitted"
+  | "changes-requested"
+  | "completed"
+  | "overdue"
   | "cancelled";
 
 export type TaskPriority = "low" | "medium" | "high" | "urgent";
@@ -26,6 +32,8 @@ export interface Task {
   comments?: TaskComment[];
   /** What the assignee handed in when completing the task. */
   submission?: TaskSubmission;
+  /** The assigner's latest decision on the submission. */
+  review?: TaskReview;
   /** Set on program-month tasks (see src/config/monthly-tasks.ts), e.g. "month-1". */
   monthlyCycle?: string;
   monthlyTemplateId?: string;
@@ -40,6 +48,16 @@ export interface TaskSubmission {
   attachments: ReportAttachment[];
   submittedBy: string;
   submittedAt: Timestamp | Date;
+}
+
+export type TaskReviewDecision = "accepted" | "changes-requested";
+
+export interface TaskReview {
+  decision: TaskReviewDecision;
+  /** Feedback for the assignee; required when asking for changes. */
+  note?: string;
+  reviewedBy: string;
+  reviewedAt: Timestamp | Date;
 }
 
 export interface TaskComment {
@@ -71,5 +89,5 @@ export interface UpdateTaskRequest {
   eventId?: string | null;
 }
 
-/** Statuses a task can be in while still needing work. */
-export const OPEN_TASK_STATUSES: TaskStatus[] = ["assigned", "in-progress", "overdue"];
+/** Statuses a task can be in while still needing work (from the assignee or its reviewer). */
+export const OPEN_TASK_STATUSES: TaskStatus[] = ["assigned", "in-progress", "submitted", "changes-requested", "overdue"];

@@ -12,8 +12,10 @@ import {
   Task,
   TaskStatus,
   TaskSubmission,
+  TaskReview,
   CreateTaskRequest,
   UpdateTaskRequest,
+  OPEN_TASK_STATUSES,
 } from "@/types/task.types";
 import type { ReportAttachment } from "@/types/report.types";
 import { AuthorizationError, ConflictError, NotFoundError, ValidationError, logger } from "@/utils/errors";
@@ -180,7 +182,7 @@ export async function getTasks(filters: {
       queryFilters.push({ field: "status", operator: "in", value: WORKING_STATUSES });
       queryFilters.push({ field: "dueDate", operator: "<", value: now });
     } else if (filters.status === "open") {
-      queryFilters.push({ field: "status", operator: "in", value: [...WORKING_STATUSES, "overdue"] });
+      queryFilters.push({ field: "status", operator: "in", value: OPEN_TASK_STATUSES });
     } else if (filters.status === "assigned" || filters.status === "in-progress") {
       // Past-due tasks show as overdue, so exclude them from the working statuses.
       queryFilters.push({ field: "status", operator: "==", value: filters.status });
@@ -313,10 +315,16 @@ export async function updateTask(
   }
 }
 
+/** Whether finishing a task needs its assigner's sign-off (not for tasks you set yourself). */
+export function needsReview(task: Pick<Task, "assignedBy" | "assignedTo">): boolean {
+  return task.assignedBy !== task.assignedTo;
+}
+
 /**
- * The assignee hands in their work: a note plus optional PDFs, which marks the
- * task completed (notifying the assigner, like any completion). `assigneeId`
- * is who the work is submitted as; `actorUserId` who actually did it.
+ * The assignee hands in their work: a note plus optional PDFs. The task then
+ * waits in "submitted" until its assigner accepts it or asks for changes (see
+ * reviewTask); a task you assigned yourself completes straight away.
+ * `assigneeId` is who the work is submitted as; `actorUserId` who actually did it.
  */
 export async function submitTask(
   taskId: string,
@@ -328,14 +336,116 @@ export async function submitTask(
   if (!task) throw new NotFoundError(`Task ${taskId} not found`);
   if (task.assignedTo !== assigneeId) throw new AuthorizationError("Only the person this task is assigned to can submit it");
   if (task.status === "cancelled") throw new ConflictError("This task was cancelled");
+  if (needsReview(task) && task.status === "completed") throw new ConflictError("This task was already accepted");
   await requireOwnAttachments(input.attachments, assigneeId);
 
   const submission: TaskSubmission = { ...input, submittedBy: assigneeId, submittedAt: new Date() };
-  await updateDoc<Task>("tasks", taskId, { submission } as Partial<Task>);
-  // Completion notifies the assigner and logs the change.
-  return task.status === "completed"
-    ? (await getTaskById(taskId))!
-    : updateTask(taskId, { status: "completed" }, actorUserId);
+
+  if (!needsReview(task)) {
+    await updateDoc<Task>("tasks", taskId, { submission } as Partial<Task>);
+    return task.status === "completed"
+      ? (await getTaskById(taskId))!
+      : updateTask(taskId, { status: "completed" }, actorUserId);
+  }
+
+  await updateDoc<Task>("tasks", taskId, { submission, status: "submitted" } as Partial<Task>);
+
+  await createActivityLog({
+    userId: actorUserId,
+    action: "task-updated",
+    description: `Submitted task "${task.title}" for review`,
+    entityType: "task",
+    entityId: taskId,
+    changes: task.status !== "submitted" ? { status: { oldValue: task.status, newValue: "submitted" } } : undefined,
+  });
+
+  try {
+    if (await isNotificationEnabled(task.assignedBy, "task-completed")) {
+      const [assignee, assigner] = await Promise.all([
+        getDocById<User>("users", task.assignedTo),
+        getDocById<User>("users", task.assignedBy),
+      ]);
+      await createNotification({
+        userId: task.assignedBy,
+        type: "task-completed",
+        title: `${assignee?.name || "Someone"} submitted a task for your review`,
+        message: task.title,
+        relatedId: taskId,
+        relatedType: "task",
+        actionUrl: assigner ? TASKS_ROUTE_BY_ROLE[assigner.role] : undefined,
+      });
+    }
+  } catch (error) {
+    logger.error(`Failed to notify ${task.assignedBy} of task submission`, error);
+  }
+
+  return (await getTaskById(taskId))!;
+}
+
+/**
+ * The assigner's decision on submitted work: accepting completes the task;
+ * asking for changes sends it back to the assignee with feedback, and they
+ * submit again. `reviewerId` is who reviews (shown); `actorUserId` who did it.
+ */
+export async function reviewTask(
+  taskId: string,
+  input: { decision: "accept" | "request-changes"; note?: string },
+  reviewerId: string,
+  actorUserId: string = reviewerId
+): Promise<Task> {
+  const task = await getTaskById(taskId);
+  if (!task) throw new NotFoundError(`Task ${taskId} not found`);
+  if (task.status !== "submitted") throw new ConflictError(`"${task.title}" isn't waiting for review`);
+
+  const accepted = input.decision === "accept";
+  const note = input.note?.trim() || undefined;
+  if (!accepted && !note) throw new ValidationError("Say what needs to change");
+
+  const review: TaskReview = {
+    decision: accepted ? "accepted" : "changes-requested",
+    note,
+    reviewedBy: reviewerId,
+    reviewedAt: new Date(),
+  };
+  const status: TaskStatus = accepted ? "completed" : "changes-requested";
+  await updateDoc<Task>("tasks", taskId, {
+    status,
+    review,
+    completedDate: accepted ? new Date() : null,
+  } as unknown as Partial<Task>);
+
+  await createActivityLog({
+    userId: actorUserId,
+    action: accepted ? "task-completed" : "task-updated",
+    description: accepted ? `Accepted task "${task.title}"` : `Asked for changes on task "${task.title}"`,
+    entityType: "task",
+    entityId: taskId,
+    changes: { status: { oldValue: task.status, newValue: status } },
+  });
+
+  try {
+    const [assignee, reviewer] = await Promise.all([
+      getDocById<User>("users", task.assignedTo),
+      getDocById<User>("users", reviewerId),
+    ]);
+    if (assignee) {
+      await createNotification({
+        userId: assignee.id,
+        type: "task-reviewed",
+        title: accepted
+          ? `${reviewer?.name || "Your reviewer"} accepted your task`
+          : `${reviewer?.name || "Your reviewer"} asked for changes`,
+        message: note ? `${task.title} · ${note}` : task.title,
+        relatedId: taskId,
+        relatedType: "task",
+        actionUrl: TASKS_ROUTE_BY_ROLE[assignee.role],
+      });
+    }
+  } catch (error) {
+    logger.error(`Failed to notify ${task.assignedTo} of task review`, error);
+  }
+
+  return (await getTaskById(taskId))!;
 }
 
 export async function deleteTask(taskId: string, deletedByUserId: string): Promise<void> {
