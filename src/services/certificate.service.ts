@@ -1,10 +1,12 @@
-import { assignSequenceNumber, batchWrite, getDocById, getDocsByIds, queryDocs } from "@/utils/firestore";
+import { assignSequenceNumber, batchWrite, getDocById, getDocsByIds, queryDocs, updateDoc } from "@/utils/firestore";
 import { toDate } from "@/utils/aggregation";
 import { canAccessUserInChain } from "@/utils/authorization";
 import { AuthorizationError, NotFoundError, logger } from "@/utils/errors";
 import { createActivityLog } from "./activitylog.service";
 import { notifyUsers } from "./notification.service";
 import { chunk, getTeam } from "./team.service";
+import { getCurrentCohort } from "./cohort.service";
+import { FIRST_SYSTEM_COHORT, cohortId } from "@/config/cohorts";
 import type { Certificate, CertificateKind } from "@/types/certificate.types";
 import type { Event } from "@/types/event.types";
 import type { User, UserRole } from "@/types/user.types";
@@ -32,11 +34,17 @@ const certificateId = (eventId: string, userId: string) => `${eventId}_${userId}
 const pad = (value: number) => String(value).padStart(3, "0");
 
 /**
- * "YLP/{activity}/{position}", e.g. YLP/007/001: the activity's number (given
- * once, the first time it issues certificates) and the certificate's position
- * within it — the organizer (youth leader) is 001, participants follow.
+ * "YLP{cohort}/{activity}/{position}", e.g. YLP2/007/001: the cohort the
+ * activity was first certified in, the activity's number within that cohort
+ * (restarting at 001 each cohort), and the certificate's position within the
+ * activity — the organizer (youth leader) is 001, participants follow.
  */
-const certificateNumber = (activityNumber: number, position: number) => `YLP/${pad(activityNumber)}/${pad(position)}`;
+const certificateNumber = (cohortNumber: number, activityNumber: number, position: number) =>
+  `YLP${cohortNumber}/${pad(activityNumber)}/${pad(position)}`;
+
+/** Activity counter per cohort. YLP 2.0 keeps the original counter so activities numbered before cohorts were added don't repeat. */
+const activityCounterId = (id: string) =>
+  id === FIRST_SYSTEM_COHORT.id ? "certificate-activities" : `certificate-activities-${id}`;
 
 /** Organizers first (youth leaders before anyone else), then participants by name. */
 function issueOrder(kindByUser: Map<string, CertificateKind>) {
@@ -67,7 +75,18 @@ export async function issueEventCertificates(event: Event, issuedById: string): 
   const pending = recipients.filter((recipient) => !alreadyIssued.has(recipient.id)).sort(issueOrder(kindByUser));
   if (pending.length === 0) return 0;
 
-  const activityNumber = await assignSequenceNumber("certificate-activities", "events", event.id, "certificateActivityNumber");
+  // An activity stays in the cohort it was first certified in, even if more certificates follow after a new cohort starts.
+  let cohortNumber = event.certificateCohortNumber;
+  if (!cohortNumber) {
+    cohortNumber = (await getCurrentCohort()).number;
+    await updateDoc("events", event.id, { certificateCohortNumber: cohortNumber });
+  }
+  const activityNumber = await assignSequenceNumber(
+    activityCounterId(cohortId(cohortNumber)),
+    "events",
+    event.id,
+    "certificateActivityNumber"
+  );
   // Certificates added later (e.g. evidence re-verified with more participants) continue the activity's numbering.
   const lastPosition = existing.reduce((max, certificate) => Math.max(max, certificate.position ?? 0), 0);
   const issuedAt = new Date();
@@ -84,7 +103,7 @@ export async function issueEventCertificates(event: Event, issuedById: string): 
       eventTitle: event.title,
       eventLocation: event.location,
       eventDate: toDate(event.startDate) ?? issuedAt,
-      certificateNumber: certificateNumber(activityNumber, lastPosition + index + 1),
+      certificateNumber: certificateNumber(cohortNumber, activityNumber, lastPosition + index + 1),
       activityNumber,
       position: lastPosition + index + 1,
       issuedBy: issuedById,

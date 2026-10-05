@@ -63,8 +63,10 @@ export interface Event {
   reviewComment?: string;
   evidence?: EventEvidence;
   certificatesIssuedAt?: Timestamp | Date;
-  /** Given the first time the activity issues certificates; the middle part of "YLP/007/001". */
+  /** Given the first time the activity issues certificates, counting from 1 in each cohort; the "007" of "YLP2/007/001". */
   certificateActivityNumber?: number;
+  /** The cohort (2 for YLP 2.0) the activity was first certified in; the "2" of "YLP2/007/001". */
+  certificateCohortNumber?: number;
   certificateCount?: number;
   createdAt: Timestamp | Date;
   updatedAt: Timestamp | Date;
