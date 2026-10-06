@@ -1,12 +1,12 @@
 import { Check } from "lucide-react";
-import type { EventStatus } from "@/types/event.types";
+import type { ActivityStatus } from "@/types/activity.types";
 import { WORKFLOW_STEPS, completedSteps } from "./activity.types";
 
 /**
  * The activity workflow as a row of steps. With a `status`, steps already done
  * are ticked and the next one is highlighted; without one it's a legend.
  */
-export function WorkflowSteps({ status, compact = false }: { status?: EventStatus; compact?: boolean }) {
+export function WorkflowSteps({ status, compact = false }: { status?: ActivityStatus; compact?: boolean }) {
   const done = status ? completedSteps(status) : 0;
   const rejected = status === "rejected";
 

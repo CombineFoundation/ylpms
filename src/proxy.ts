@@ -23,9 +23,9 @@ export function proxy(req: NextRequest) {
     return NextResponse.redirect(new URL("/login", req.url));
   }
 
-  // The portal root has no page of its own; send it to the dashboard with a real 307.
-  if (req.nextUrl.pathname === "/Head-of-RO" || req.nextUrl.pathname === "/Head-of-RO/") {
-    return NextResponse.redirect(new URL("/Head-of-RO/dashboard", req.url));
+  // Portal roots have no page of their own; send them to the dashboard with a real 307.
+  if (req.nextUrl.pathname.replace(/\/$/, "") === rule.prefix) {
+    return NextResponse.redirect(new URL(`${rule.prefix}/dashboard`, req.url));
   }
 
   return NextResponse.next();

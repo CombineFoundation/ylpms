@@ -16,18 +16,18 @@ import type { AnalyticsSummary } from "./analytics.types";
 
 type AnalyticsChartsProps = {
   userGrowth: AnalyticsSummary["userGrowth"];
-  eventsPerMonth: AnalyticsSummary["eventsPerMonth"];
+  activitiesPerMonth: AnalyticsSummary["activitiesPerMonth"];
   volunteersByRegion: AnalyticsSummary["volunteersByRegion"];
 };
 
 const tooltipStyle = { fontSize: 11, borderRadius: 8, border: "1px solid #e5e7eb" };
 
-export function AnalyticsCharts({ userGrowth, eventsPerMonth, volunteersByRegion }: AnalyticsChartsProps) {
+export function AnalyticsCharts({ userGrowth, activitiesPerMonth, volunteersByRegion }: AnalyticsChartsProps) {
   const userGrowthMax = Math.max(1, ...userGrowth.map((point) => point.value));
   const userGrowthDomainMax = Math.ceil(userGrowthMax / 4) * 4 || 4;
 
-  const eventsMax = Math.max(1, ...eventsPerMonth.map((point) => point.value));
-  const eventsDomainMax = Math.ceil(eventsMax / 3) * 3 || 3;
+  const activitiesMax = Math.max(1, ...activitiesPerMonth.map((point) => point.value));
+  const activitiesDomainMax = Math.ceil(activitiesMax / 3) * 3 || 3;
 
   const totalVolunteers = volunteersByRegion.reduce((sum, region) => sum + region.value, 0);
 
@@ -58,7 +58,7 @@ export function AnalyticsCharts({ userGrowth, eventsPerMonth, volunteersByRegion
           <h2 className="text-sm font-bold text-gray-800">Activities per Month</h2>
           <p className="mb-4 text-xs text-gray-400">Activities starting in each month</p>
           <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={eventsPerMonth} barSize={20}>
+            <BarChart data={activitiesPerMonth} barSize={20}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
               <XAxis dataKey="month" tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
               <YAxis
@@ -66,7 +66,7 @@ export function AnalyticsCharts({ userGrowth, eventsPerMonth, volunteersByRegion
                 axisLine={false}
                 tickLine={false}
                 allowDecimals={false}
-                domain={[0, eventsDomainMax]}
+                domain={[0, activitiesDomainMax]}
               />
               <Tooltip contentStyle={tooltipStyle} formatter={(value) => [value, "Activities"]} />
               <Bar dataKey="value" fill="#1e3a5f" radius={[3, 3, 0, 0]} />

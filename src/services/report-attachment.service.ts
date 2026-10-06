@@ -1,17 +1,20 @@
 import "server-only";
 
 import { getFirebaseAdminBucket } from "@/lib/firebase-admin";
-import { NotFoundError, ValidationError, logger } from "@/utils/errors";
+import { NotFoundError, ValidationError } from "@/utils/errors";
+import { acceptUpload, createDownloadUrl, createUploadTicket, type UploadTicket } from "./direct-upload.service";
 import type { ReportAttachment } from "@/types/report.types";
 
 /**
- * Report attachments - PDFs uploaded through the API (storage.rules deny all
- * browser access) and streamed back only to people allowed to view the report.
+ * Report attachments - PDFs (for reports, task submissions and activity
+ * evidence) uploaded straight to Storage with a signed URL, checked, and
+ * opened through short-lived links given only to people allowed to see them.
  */
 
 export const MAX_REPORT_PDF_BYTES = 10 * 1024 * 1024;
 export const MAX_REPORT_ATTACHMENTS = 5;
 
+const PDF = "application/pdf";
 const ownerPrefix = (ownerId: string) => `reports/${ownerId}/`;
 
 function safeFileName(name: string) {
@@ -19,29 +22,34 @@ function safeFileName(name: string) {
   return base.toLowerCase().endsWith(".pdf") ? base : `${base}.pdf`;
 }
 
-/** Validates and stores one PDF under the owner's folder. Nothing is linked to a report yet. */
-export async function uploadReportPdf(file: File, ownerId: string): Promise<ReportAttachment> {
-  if (file.size === 0) throw new ValidationError("The file is empty");
+/** Step 1: a signed URL to upload one PDF into the owner's incoming folder. */
+export async function createReportPdfUpload(file: { name: string; size: number }, ownerId: string): Promise<UploadTicket> {
   if (file.size > MAX_REPORT_PDF_BYTES) throw new ValidationError("PDFs must be 10 MB or smaller");
+  return createUploadTicket(ownerId, PDF, MAX_REPORT_PDF_BYTES);
+}
 
-  const bytes = Buffer.from(await file.arrayBuffer());
-  // Check the real file signature, not just the name/content type the browser sent.
-  if (bytes.subarray(0, 5).toString("latin1") !== "%PDF-") {
-    throw new ValidationError("Only PDF files can be attached");
-  }
-
-  const name = safeFileName(file.name);
+/** Step 2: checks the uploaded PDF and files it under the owner's folder. Nothing is linked to a report yet. */
+export async function confirmReportPdfUpload(uploadPath: string, fileName: string, ownerId: string): Promise<ReportAttachment> {
+  const name = safeFileName(fileName);
   const path = `${ownerPrefix(ownerId)}${crypto.randomUUID()}.pdf`;
-  await getFirebaseAdminBucket()
-    .file(path)
-    .save(bytes, {
-      contentType: "application/pdf",
-      resumable: false,
-      metadata: { contentDisposition: `inline; filename="${name}"`, metadata: { uploadedBy: ownerId } },
-    });
-
-  logger.info(`Report PDF uploaded: ${path} (${bytes.length} bytes)`);
-  return { path, name, size: bytes.length };
+  const size = await acceptUpload({
+    uploadPath,
+    ownerId,
+    finalPath: path,
+    contentType: PDF,
+    fileName: name,
+    headBytes: 5,
+    // Check the real file signature, not just the name/content type the browser sent.
+    check: (bytes, head) =>
+      bytes === 0
+        ? "The file is empty"
+        : bytes > MAX_REPORT_PDF_BYTES
+          ? "PDFs must be 10 MB or smaller"
+          : head.toString("latin1") !== "%PDF-"
+            ? "Only PDF files can be attached"
+            : null,
+  });
+  return { path, name, size };
 }
 
 /**
@@ -62,10 +70,15 @@ export async function requireOwnAttachments(attachments: ReportAttachment[], sub
   }
 }
 
-export async function readReportAttachment(attachment: ReportAttachment): Promise<Buffer> {
-  const file = getFirebaseAdminBucket().file(attachment.path);
-  const [exists] = await file.exists();
-  if (!exists) throw new NotFoundError("This attachment is no longer available");
-  const [contents] = await file.download();
-  return contents;
+/**
+ * `ownerId` is who the attachment must have been uploaded by (the report's
+ * submitter, the task's assignee or the activity's organizer), so a doc that
+ * was tampered with can't be used to read someone else's file. Returns a
+ * short-lived link that opens the PDF.
+ */
+export async function reportAttachmentUrl(attachment: ReportAttachment, ownerId: string): Promise<string> {
+  if (!attachment.path.startsWith(ownerPrefix(ownerId)) || attachment.path.includes("..")) {
+    throw new NotFoundError("Attachment not found");
+  }
+  return createDownloadUrl(attachment.path, attachment.name, PDF);
 }

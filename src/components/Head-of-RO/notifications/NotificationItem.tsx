@@ -57,7 +57,7 @@ export function NotificationItem({ notification, portalPrefix = "/Head-of-RO/", 
       <div className="mt-0.5 shrink-0">
         <div
           className={`flex h-9 w-9 items-center justify-center rounded-full ${
-            !notification.read ? "bg-orange-100 text-orange-600" : "bg-gray-100 text-gray-400"
+            !notification.read ? "bg-orange-100 text-brand-dark" : "bg-gray-100 text-gray-400"
           }`}
         >
           <Icon size={18} />
@@ -79,7 +79,7 @@ export function NotificationItem({ notification, portalPrefix = "/Head-of-RO/", 
             title
           )}
           {!notification.read && (
-            <Circle size={8} className="mt-1.5 shrink-0 fill-orange-500 text-orange-500" aria-label="Unread" />
+            <Circle size={8} className="mt-1.5 shrink-0 fill-brand text-brand" aria-label="Unread" />
           )}
         </div>
         {notification.message && <p className="mt-0.5 line-clamp-2 text-xs text-gray-500">{notification.message}</p>}
@@ -91,7 +91,7 @@ export function NotificationItem({ notification, portalPrefix = "/Head-of-RO/", 
           <button
             type="button"
             onClick={() => onMarkRead(notification.id)}
-            className="text-xs font-medium text-orange-600 hover:text-orange-700"
+            className="text-xs font-medium text-brand-dark hover:text-brand-dark"
           >
             Mark read
           </button>

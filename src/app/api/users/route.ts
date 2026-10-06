@@ -1,5 +1,6 @@
 import { withAuth } from "@/middleware/auth.middleware";
 import { getUsers, createUser, enrichUsersForList } from "@/services/user.service";
+import { requireIdNotRequested } from "@/services/member-request.service";
 import { requireRole } from "@/utils/auth";
 import { requireCanCreateRole } from "@/utils/authorization";
 import { AuthenticationError, AuthorizationError, ValidationError } from "@/utils/errors";
@@ -68,6 +69,8 @@ export const POST = withAuth(async (req) => {
 
     // A Head RO can't mint developer or other Head RO accounts.
     requireCanCreateRole(req.user.role, validatedData.role);
+    // The ID mustn't be one a pending youth leader / volunteer request is waiting on.
+    if (validatedData.memberId) await requireIdNotRequested(validatedData.memberId);
 
     const user = await createUser(validatedData, req.user.userId);
 

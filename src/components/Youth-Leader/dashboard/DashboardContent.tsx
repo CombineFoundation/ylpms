@@ -28,7 +28,7 @@ function WelcomeBanner() {
       <div className="flex flex-wrap items-center gap-3">
         <Link
           href="/youth-leader/tasks?new=1"
-          className="flex items-center gap-1.5 rounded-lg bg-orange-500 px-4 py-2 text-sm font-medium text-white hover:bg-orange-600"
+          className="flex items-center gap-1.5 rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-dark"
         >
           <Plus size={15} />
           Assign Task
@@ -48,7 +48,7 @@ function WelcomeBanner() {
 function StatCards({ summary }: { summary: YouthLeaderDashboardSummary }) {
   const { stats, pipeline, certificates } = summary;
   const cards = [
-    { label: "MY VOLUNTEERS", value: stats.volunteers, sub: "Reporting to you", icon: HandHelping, accent: "bg-orange-100 text-orange-500" },
+    { label: "MY VOLUNTEERS", value: stats.volunteers, sub: "Reporting to you", icon: HandHelping, accent: "bg-orange-100 text-brand" },
     {
       label: "ACTIVE TASKS",
       value: stats.activeTasks,
@@ -98,7 +98,7 @@ export function DashboardContent() {
       {!isLoading && error && (
         <div role="alert" className="flex items-center gap-3 text-sm text-red-500">
           {error}
-          <button type="button" onClick={reload} className="font-medium text-orange-500 hover:underline">
+          <button type="button" onClick={reload} className="font-medium text-brand hover:underline">
             Retry
           </button>
         </div>
@@ -126,7 +126,7 @@ export function DashboardContent() {
           <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
             <ActivitySummaryPanel
               activities={summary.activities}
-              eventsHref="/youth-leader/activities"
+              activitiesHref="/youth-leader/activities"
               showReview={false}
               title="Upcoming Activities"
             />

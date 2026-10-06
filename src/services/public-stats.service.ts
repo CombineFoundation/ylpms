@@ -6,7 +6,7 @@ import { FIRST_SYSTEM_COHORT, YLP_1 } from "@/config/cohorts";
 import { endOfPktDay, startOfPktDay } from "@/utils/monthly-cycle";
 import { listCohorts, toApiCohort } from "./cohort.service";
 import type { CertificateStatus } from "@/types/certificate.types";
-import type { EventMode, EventStatus } from "@/types/event.types";
+import type { ActivityMode, ActivityStatus } from "@/types/activity.types";
 import type { UserRole } from "@/types/user.types";
 import type { ImpactFigures, PublicStats } from "@/types/public-stats.types";
 
@@ -28,12 +28,12 @@ import type { ImpactFigures, PublicStats } from "@/types/public-stats.types";
  * - Digital reach and student body partnerships: entered per cohort by Head RO.
  */
 
-const HELD_STATUSES: EventStatus[] = ["evidence-submitted", "completed"];
+const HELD_STATUSES: ActivityStatus[] = ["evidence-submitted", "completed"];
 const BENEFICIARY_ROLES: UserRole[] = ["volunteer", "youth-leader", "ro"];
 const CITY_ROLES: UserRole[] = ["volunteer", "youth-leader"];
 
 type UserRow = { role?: UserRole; university?: string; region?: string };
-type EventRow = { status?: EventStatus; mode?: EventMode; evidence?: { participantIds?: string[] } };
+type ActivityRow = { status?: ActivityStatus; mode?: ActivityMode; evidence?: { participantIds?: string[] } };
 type CertificateRow = { status?: CertificateStatus };
 type UserIdRow = UserRow & { id: string };
 
@@ -77,19 +77,19 @@ async function selectUsers(): Promise<UserIdRow[]> {
 }
 
 async function countLive(): Promise<{ live: ImpactFigures; current: PublicStats["current"] }> {
-  const [users, events, certificates, cohorts] = await Promise.all([
+  const [users, activities, certificates, cohorts] = await Promise.all([
     selectUsers(),
-    selectFields<EventRow>("events", [{ field: "status", operator: "in", value: HELD_STATUSES }], ["status", "mode", "evidence.participantIds"]),
+    selectFields<ActivityRow>("events", [{ field: "status", operator: "in", value: HELD_STATUSES }], ["status", "mode", "evidence.participantIds"]),
     selectFields<CertificateRow>("certificates", [{ field: "status", operator: "==", value: "issued" }], ["status"]),
     listCohorts(),
   ]);
 
   const beneficiaries = new Set<string>();
   users.forEach((user) => user.role && BENEFICIARY_ROLES.includes(user.role) && beneficiaries.add(user.id));
-  events.forEach((event) => event.evidence?.participantIds?.forEach((id) => beneficiaries.add(id)));
+  activities.forEach((activity) => activity.evidence?.participantIds?.forEach((id) => beneficiaries.add(id)));
 
   const distinct = (values: (string | undefined)[]) => new Set(values.map(normalizeName).filter(Boolean)).size;
-  const webinars = events.filter((event) => event.mode === "online").length;
+  const webinars = activities.filter((activity) => activity.mode === "online").length;
 
   const live: ImpactFigures = {
     youthLeaders: users.filter((user) => user.role === "youth-leader").length,
@@ -97,7 +97,7 @@ async function countLive(): Promise<{ live: ImpactFigures; current: PublicStats[
     universities: distinct(users.map((user) => user.university)),
     cities: distinct(users.filter((user) => user.role && CITY_ROLES.includes(user.role)).map((user) => user.region)),
     webinars,
-    onsiteWorkshops: events.length - webinars,
+    onsiteWorkshops: activities.length - webinars,
     studentBodyPartnerships: cohorts.reduce((sum, cohort) => sum + (cohort.studentBodyPartnerships ?? 0), 0),
     directBeneficiaries: beneficiaries.size,
     digitalReach: cohorts.reduce((sum, cohort) => sum + (cohort.digitalReach ?? 0), 0),

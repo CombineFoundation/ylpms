@@ -1,4 +1,4 @@
-import type { EventStatus } from "@/types/event.types";
+import type { ActivityStatus } from "@/types/activity.types";
 
 export type ReportStatus = "draft" | "submitted" | "reviewed" | "approved" | "rejected";
 
@@ -9,8 +9,8 @@ export type ActivitySummary = {
   upcoming: number;
   completedThisMonth: number;
   certificatesIssued: number;
-  reviewQueue: { id: string; title: string; status: EventStatus; organizerName: string; date: string }[];
-  upcomingEvents: { id: string; title: string; date: string; location: string; organizerName: string }[];
+  reviewQueue: { id: string; title: string; status: ActivityStatus; organizerName: string; date: string }[];
+  upcomingActivities: { id: string; title: string; date: string; location: string; organizerName: string }[];
 };
 
 /** Pending member requests: ones to approve (SRO / RO) or ones you sent (youth leader). */
@@ -36,7 +36,7 @@ export type SRODashboardSummary = {
   memberRequests: MemberRequestSummary;
 };
 
-const AVATAR_COLORS = ["bg-red-400", "bg-orange-400", "bg-blue-500", "bg-emerald-500", "bg-orange-500", "bg-purple-500"];
+const AVATAR_COLORS = ["bg-red-400", "bg-orange-400", "bg-blue-500", "bg-emerald-500", "bg-brand", "bg-purple-500"];
 
 /** Stable avatar colour per id, so a person keeps the same colour across widgets. */
 export function avatarColor(id: string) {

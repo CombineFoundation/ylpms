@@ -15,11 +15,12 @@ export interface Certificate {
   recipientRole: UserRole;
   kind: CertificateKind;
   title: string;
+  /** The activity's id, title, location and date. Stored under these "event" field names, which existing certificates use. */
   eventId: string;
   eventTitle: string;
   eventLocation: string;
   eventDate: Timestamp | Date;
-  /** "YLP/{activity}/{position}", e.g. YLP/007/001 (older certificates use YLP-2026-XXXXXXXX). */
+  /** "YLP{cohort}/{activity}/{position}", e.g. YLP2/007/001 (older certificates use YLP/007/001 or YLP-2026-XXXXXXXX). */
   certificateNumber: string;
   /** The activity's certificate number (shared by everyone certified for it). */
   activityNumber?: number;

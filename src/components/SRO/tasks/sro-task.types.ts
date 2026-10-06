@@ -20,6 +20,8 @@ export type OpenActivity = { id: string; title: string; startDate?: TimestampInp
 export type SroTasksResponse = {
   assignedToMe: ApiSroTask[];
   assignedByMe: ApiSroTask[];
+  /** SROs only: their youth leaders' monthly tasks (view only; each youth leader's RO reviews them). */
+  teamMonthly?: ApiSroTask[];
   assignees: Assignee[];
   /** Only filled for youth leaders. */
   openActivities?: OpenActivity[];

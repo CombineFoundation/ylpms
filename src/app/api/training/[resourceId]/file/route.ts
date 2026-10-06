@@ -1,15 +1,14 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { withAuth } from "@/middleware/auth.middleware";
 import { canManageTrainingResource, getTrainingResourceById } from "@/services/training.service";
-import { readTrainingFile } from "@/services/training-file.service";
+import { trainingFileUrl } from "@/services/training-file.service";
 import { AuthenticationError, NotFoundError } from "@/utils/errors";
-import { apiError } from "@/utils/api-response";
-import { INLINE_TRAINING_TYPES } from "@/utils/training-upload-rules";
+import { apiError, apiSuccess } from "@/utils/api-response";
 
 type Params = { params: Promise<{ resourceId: string }> };
 
 /**
- * GET /api/training/[resourceId]/file - Stream a resource's uploaded file to anyone who can
+ * GET /api/training/[resourceId]/file - A short-lived link to a resource's uploaded file, for anyone who can
  * see the resource (every role for published ones; drafts only to people who manage them).
  */
 export async function GET(req: NextRequest, { params }: Params) {
@@ -24,18 +23,7 @@ export async function GET(req: NextRequest, { params }: Params) {
       }
       if (!resource.file) throw new NotFoundError("This resource has no uploaded file");
 
-      const contents = await readTrainingFile(resource.file);
-      const disposition = INLINE_TRAINING_TYPES.includes(resource.file.contentType) ? "inline" : "attachment";
-      return new NextResponse(new Uint8Array(contents), {
-        status: 200,
-        headers: {
-          "Content-Type": resource.file.contentType,
-          "Content-Length": String(contents.length),
-          "Content-Disposition": `${disposition}; filename="${resource.file.name.replace(/"/g, "")}"`,
-          "Cache-Control": "private, no-store",
-          "X-Content-Type-Options": "nosniff",
-        },
-      });
+      return apiSuccess({ url: await trainingFileUrl(resource.file) });
     } catch (error) {
       return apiError(error);
     }

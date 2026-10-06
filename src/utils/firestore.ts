@@ -5,7 +5,7 @@ import { logger } from "@/utils/errors";
 
 export type Filter = {
   field: string;
-  operator: "==" | "<" | "<=" | ">" | ">=" | "!=" | "in" | "not-in" | "array-contains";
+  operator: "==" | "<" | "<=" | ">" | ">=" | "!=" | "in" | "not-in" | "array-contains" | "array-contains-any";
   value: unknown;
 };
 
@@ -33,9 +33,26 @@ export async function getDocById<T extends DocumentData>(collectionName: string,
   return snapshot.exists ? withId<T>(snapshot.id, snapshot.data() || {}) : null;
 }
 
+/** Every existing doc among `docIds`, fetched in one round trip. */
 export async function getDocsByIds<T extends DocumentData>(collectionName: string, docIds: string[]): Promise<T[]> {
-  const documents = await Promise.all(docIds.map((docId) => getDocById<T>(collectionName, docId)));
-  return documents.filter(Boolean) as T[];
+  const ids = [...new Set(docIds.filter(Boolean))];
+  if (ids.length === 0) return [];
+  const db = getFirebaseAdminDb();
+  const snapshots = await db.getAll(...ids.map((docId) => db.collection(collectionName).doc(docId)));
+  return snapshots.filter((snapshot) => snapshot.exists).map((snapshot) => withId<T>(snapshot.id, snapshot.data() || {}));
+}
+
+// ---------------------------------------------------------------------------
+// Write tracking: caches built from a collection (e.g. the performance tree)
+// compare these counters to know whether this server instance has written to
+// it since they were built.
+
+const writeCounts = new Map<string, number>();
+
+export const writeCount = (collectionName: string) => writeCounts.get(collectionName) ?? 0;
+
+function noteWrite(collectionName: string) {
+  writeCounts.set(collectionName, writeCount(collectionName) + 1);
 }
 
 export async function queryDocs<T extends DocumentData>(
@@ -127,6 +144,7 @@ export async function createDoc<T extends DocumentData>(collectionName: string, 
     updatedAt: now,
   };
   await getFirebaseAdminDb().collection(collectionName).doc(docId).set(docData);
+  noteWrite(collectionName);
   return { id: docId, ...docData } as T;
 }
 
@@ -145,10 +163,68 @@ export async function updateDoc<T extends DocumentData>(collectionName: string, 
     ...changes,
     updatedAt: FieldValue.serverTimestamp(),
   });
+  noteWrite(collectionName);
+}
+
+/**
+ * updateDoc, but only if the doc's `status` is still `expectedStatus` — in a
+ * transaction, so two people acting on the same item at once (or a double
+ * click) can't both go through. Returns false, writing nothing, if the status
+ * had already changed; callers report that as a conflict.
+ */
+export async function updateDocIfStatus<T extends DocumentData>(
+  collectionName: string,
+  docId: string,
+  expectedStatus: string,
+  data: Partial<T>
+): Promise<boolean> {
+  const changes = Object.fromEntries(
+    Object.entries(removeUndefined(data as DocumentData)).map(([key, value]) => [
+      key,
+      value === null ? FieldValue.delete() : value,
+    ])
+  );
+  const db = getFirebaseAdminDb();
+  const reference = db.collection(collectionName).doc(docId);
+  const updated = await db.runTransaction(async (transaction) => {
+    const snapshot = await transaction.get(reference);
+    if (!snapshot.exists || snapshot.get("status") !== expectedStatus) return false;
+    transaction.update(reference, { ...changes, updatedAt: FieldValue.serverTimestamp() });
+    return true;
+  });
+  if (updated) noteWrite(collectionName);
+  return updated;
+}
+
+/**
+ * Read-modify-write in a transaction, so concurrent callers can't overwrite
+ * each other (Firestore retries `update` if the doc changed meanwhile).
+ * `update` gets the current doc and returns the changes, or null to write
+ * nothing; it may throw to abort. Returns the doc as it is afterwards.
+ */
+export async function updateDocAtomically<T extends DocumentData>(
+  collectionName: string,
+  docId: string,
+  update: (current: T) => Partial<T> | null
+): Promise<T> {
+  const db = getFirebaseAdminDb();
+  const reference = db.collection(collectionName).doc(docId);
+  const result = await db.runTransaction(async (transaction) => {
+    const snapshot = await transaction.get(reference);
+    if (!snapshot.exists) throw new Error(`${collectionName}/${docId} does not exist`);
+    const current = withId<T>(snapshot.id, snapshot.data() || {});
+    const changes = update(current);
+    if (!changes) return current;
+    transaction.update(reference, { ...removeUndefined(changes as DocumentData), updatedAt: FieldValue.serverTimestamp() });
+    return { ...current, ...changes };
+  });
+  noteWrite(collectionName);
+  return result;
 }
 
 export async function deleteDocFromFirestore(collectionName: string, docId: string): Promise<void> {
   await getFirebaseAdminDb().collection(collectionName).doc(docId).delete();
+  noteWrite(collectionName);
 }
 
 export async function batchWrite(operations: Array<{ type: "set" | "update" | "delete"; collection: string; docId: string; data?: DocumentData }>): Promise<void> {
@@ -164,6 +240,7 @@ export async function batchWrite(operations: Array<{ type: "set" | "update" | "d
     });
     await batch.commit();
   }
+  new Set(operations.map((operation) => operation.collection)).forEach(noteWrite);
 }
 
 export async function docExists(collectionName: string, docId: string): Promise<boolean> {

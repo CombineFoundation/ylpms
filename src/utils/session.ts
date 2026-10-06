@@ -11,9 +11,13 @@ async function clearSession() {
   document.cookie = "role=; path=/; max-age=0";
 }
 
-export async function signOutUser(router: { replace: (href: string) => void }) {
+/**
+ * Full page load (not a client-side navigation) so the in-memory stores —
+ * profile, portal scope, unread count — start empty for the next user.
+ */
+export async function signOutUser() {
   await clearSession();
-  router.replace("/login");
+  window.location.assign("/login");
 }
 
 /**

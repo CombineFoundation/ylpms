@@ -165,7 +165,8 @@ export function TaskList() {
       />
       <TaskSubmissionModal
         task={viewingSubmission}
-        canReview
+        // Monthly tasks are reviewed by the youth leader's RO; Head RO only views them.
+        canReview={!viewingSubmission?.isMonthly}
         onClose={() => setViewingSubmission(null)}
         onReviewed={() => {
           setViewingSubmission(null);

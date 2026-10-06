@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { withAuth } from "@/middleware/auth.middleware";
 import { getUserById, setUsersManager } from "@/services/user.service";
+import { reassignPendingRequests } from "@/services/member-request.service";
 import { AuthenticationError, NotFoundError } from "@/utils/errors";
 import { requireRole } from "@/utils/auth";
 import { requireCanManageUser, requireUserChainAccess } from "@/utils/authorization";
@@ -34,6 +35,8 @@ export async function PUT(
       }
 
       await setUsersManager([userId], managerId, authReq.user.userId);
+      // Their pending member requests now go to the new manager.
+      await reassignPendingRequests([userId], managerId);
 
       return apiSuccess(await getUserById(userId));
     } catch (error) {

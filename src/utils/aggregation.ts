@@ -46,7 +46,7 @@ export function buildMonthlyCumulative(dates: Date[], monthCount = 7): { month: 
   }));
 }
 
-/** Count of items created within each month (not cumulative, e.g. events held per month). */
+/** Count of items created within each month (not cumulative, e.g. activities held per month). */
 export function buildMonthlyCounts(dates: Date[], monthCount = 7): { month: string; value: number }[] {
   return lastNMonths(monthCount).map(({ label, monthStart, monthEnd }) => ({
     month: label,

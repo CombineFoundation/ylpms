@@ -32,7 +32,7 @@ export function hasScopeParam(req: Request): boolean {
 
 /**
  * For requests made from a portal: a developer passing a scope param acts as
- * that person (so the task/report/event is theirs); everyone else acts as themselves.
+ * that person (so the task/report/activity is theirs); everyone else acts as themselves.
  */
 export async function resolveActingAs(
   user: { userId: string; role: UserRole },

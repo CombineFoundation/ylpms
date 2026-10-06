@@ -22,9 +22,13 @@ export interface BaseUser {
   /** Youth leaders and volunteers: the cohort they joined (e.g. "ylp-2"); none means YLP 2.0. */
   cohortId?: string;
   region?: string;
+  /** Volunteers: their role in the team (e.g. "Media"), typed by the youth leader who requested them. */
+  teamRole?: string;
   role: UserRole;
   status: UserStatus;
   lastLoginAt?: Date;
+  /** Set on new accounts: the emailed temporary password must be replaced at first sign-in. */
+  mustChangePassword?: boolean;
   phone?: string;
   profilePicture?: string;
   createdAt: Date;
@@ -83,6 +87,23 @@ export interface CreateUserRequest {
   parentId?: string; // For users being added by superiors
   memberId?: string;
   university?: string;
+  teamRole?: string;
+}
+
+/** Someone being approved or reviewed, with who they report to (direct manager first). */
+export interface MemberProfile {
+  id: string;
+  name: string;
+  role: UserRole;
+  email: string;
+  memberId?: string;
+  phone?: string;
+  university?: string;
+  /** City for youth leaders and volunteers. */
+  region?: string;
+  teamRole?: string;
+  status: UserStatus;
+  chain: { id: string; name: string; role: UserRole }[];
 }
 
 // User update request

@@ -19,12 +19,12 @@ function downloadCsv(summary: AnalyticsSummary) {
   const rows: (string | number)[][] = [
     ["Metric", "Value", "Change"],
     ["Total users", summary.stats.totalUsers.total, `${summary.stats.totalUsers.change} ${summary.stats.totalUsers.changeLabel}`],
-    ["Activities this month", summary.stats.eventsThisMonth.total, `${summary.stats.eventsThisMonth.change} ${summary.stats.eventsThisMonth.changeLabel}`],
+    ["Activities this month", summary.stats.activitiesThisMonth.total, `${summary.stats.activitiesThisMonth.change} ${summary.stats.activitiesThisMonth.changeLabel}`],
     ["Reports filed", summary.stats.reportsFiled.total, `${summary.stats.reportsFiled.change} ${summary.stats.reportsFiled.changeLabel}`],
     ["Tasks completed", summary.stats.tasksCompleted.total, `${summary.stats.tasksCompleted.change} ${summary.stats.tasksCompleted.changeLabel}`],
     [],
     ["Month", "Total users", "Activities"],
-    ...summary.userGrowth.map((point, index) => [point.month, point.value, summary.eventsPerMonth[index]?.value ?? 0]),
+    ...summary.userGrowth.map((point, index) => [point.month, point.value, summary.activitiesPerMonth[index]?.value ?? 0]),
     [],
     ["Region", "Volunteers"],
     ...summary.volunteersByRegion.map((region) => [region.name, region.value]),
@@ -90,7 +90,7 @@ export function AnalyticsContent() {
           <AnalyticsStatCards stats={summary.stats} />
           <AnalyticsCharts
             userGrowth={summary.userGrowth}
-            eventsPerMonth={summary.eventsPerMonth}
+            activitiesPerMonth={summary.activitiesPerMonth}
             volunteersByRegion={summary.volunteersByRegion}
           />
         </>

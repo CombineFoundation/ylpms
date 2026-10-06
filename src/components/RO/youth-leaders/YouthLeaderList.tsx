@@ -93,7 +93,7 @@ export function YouthLeaderList() {
         title="Youth Leaders"
         description={
           pendingCount > 0
-            ? `Manage youth leaders in your region · ${pendingCount} awaiting SRO approval.`
+            ? `Manage youth leaders in your region · ${pendingCount} awaiting RO approval.`
             : "Manage youth leaders in your region."
         }
         actions={
@@ -103,7 +103,7 @@ export function YouthLeaderList() {
               setFormError(null);
               setIsAdding(true);
             }}
-            className="flex items-center gap-1.5 rounded-lg bg-orange-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-orange-600"
+            className="flex items-center gap-1.5 rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-dark"
           >
             <Plus size={15} />
             Add Youth Leader

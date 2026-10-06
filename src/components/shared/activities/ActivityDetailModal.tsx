@@ -7,6 +7,7 @@ import { formatFileSize } from "@/lib/report-attachments";
 import { roleTitles } from "@/hooks/useCurrentProfile";
 import { formatRelativeTime } from "@/utils/user-status";
 import { Modal } from "@/components/ui/Modal";
+import { MemberProfileCard, nameWithRole } from "@/components/shared/MemberProfileCard";
 import { openEvidencePdf, withScope, type ActivityScope } from "./activity.api";
 import { WorkflowSteps } from "./WorkflowSteps";
 import {
@@ -36,7 +37,7 @@ function PeopleList({ title, people }: { title: string; people: { id: string; na
         <ul className="mt-2 flex flex-wrap gap-2">
           {people.map((person) => (
             <li key={person.id} className="rounded-full bg-gray-100 px-3 py-1 text-xs text-gray-700" title={roleTitles[person.role]}>
-              {person.name}
+              {nameWithRole(person.name, person.role)}
             </li>
           ))}
         </ul>
@@ -57,7 +58,7 @@ export function ActivityDetailModal({ activityId, scope, onClose }: ActivityDeta
     setError(null);
     setPdfError(null);
     let cancelled = false;
-    apiFetch<ApiActivityDetail>(withScope(`/api/events/${activityId}`, scope))
+    apiFetch<ApiActivityDetail>(withScope(`/api/activities/${activityId}`, scope))
       .then((loaded) => !cancelled && setActivity(loaded))
       .catch((err) => !cancelled && setError(errorMessage(err, "Unable to load this activity.")));
     return () => {
@@ -93,12 +94,16 @@ export function ActivityDetailModal({ activityId, scope, onClose }: ActivityDeta
               {typeLabels[activity.type]}
               {activity.mode === "online" ? " · Online" : " · Onsite"}
             </span>
-            <span className="text-xs text-gray-400">Organized by {activity.organizerName}</span>
+            <span className="text-xs text-gray-400">Organized by {nameWithRole(activity.organizerName, activity.organizerRole)}</span>
           </div>
 
           {usesWorkflow(activity) && activity.status !== "cancelled" && <WorkflowSteps status={activity.status} compact />}
 
           <p className="whitespace-pre-line text-sm text-gray-600">{activity.description}</p>
+
+          {activity.organizerProfile && !activity.isOrganizer && (
+            <MemberProfileCard title="Organizer" profile={activity.organizerProfile} />
+          )}
 
           <div className="flex flex-wrap gap-4 text-sm text-gray-500">
             <span className="flex items-center gap-1.5">

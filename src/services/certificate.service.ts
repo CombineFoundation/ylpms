@@ -1,12 +1,14 @@
-import { assignSequenceNumber, batchWrite, getDocById, getDocsByIds, queryDocs } from "@/utils/firestore";
+import { assignSequenceNumber, batchWrite, getDocById, getDocsByIds, queryDocs, updateDoc } from "@/utils/firestore";
 import { toDate } from "@/utils/aggregation";
 import { canAccessUserInChain } from "@/utils/authorization";
 import { AuthorizationError, NotFoundError, logger } from "@/utils/errors";
 import { createActivityLog } from "./activitylog.service";
 import { notifyUsers } from "./notification.service";
 import { chunk, getTeam } from "./team.service";
+import { getCurrentCohort } from "./cohort.service";
+import { FIRST_SYSTEM_COHORT, cohortId } from "@/config/cohorts";
 import type { Certificate, CertificateKind } from "@/types/certificate.types";
-import type { Event } from "@/types/event.types";
+import type { Activity } from "@/types/activity.types";
 import type { User, UserRole } from "@/types/user.types";
 
 /**
@@ -17,6 +19,10 @@ import type { User, UserRole } from "@/types/user.types";
 const COLLECTION = "certificates";
 
 const CERTIFICATES_ROUTE_BY_ROLE: Partial<Record<UserRole, string>> = {
+  developer: "/Head-of-RO/certificates",
+  "head-ro": "/Head-of-RO/certificates",
+  sro: "/SRO/certificates",
+  ro: "/RO/certificates",
   "youth-leader": "/youth-leader/certificates",
   volunteer: "/volunteer/certificates",
 };
@@ -27,16 +33,25 @@ const titles: Record<CertificateKind, string> = {
 };
 
 /** Deterministic id, so verifying twice can't issue duplicates. */
-const certificateId = (eventId: string, userId: string) => `${eventId}_${userId}`;
+const certificateId = (activityId: string, userId: string) => `${activityId}_${userId}`;
+
+/** Only program members earn certificates; RO and above see their team's instead. */
+const CERTIFIED_ROLES: UserRole[] = ["youth-leader", "volunteer"];
 
 const pad = (value: number) => String(value).padStart(3, "0");
 
 /**
- * "YLP/{activity}/{position}", e.g. YLP/007/001: the activity's number (given
- * once, the first time it issues certificates) and the certificate's position
- * within it — the organizer (youth leader) is 001, participants follow.
+ * "YLP{cohort}/{activity}/{position}", e.g. YLP2/007/001: the cohort the
+ * activity was first certified in, the activity's number within that cohort
+ * (restarting at 001 each cohort), and the certificate's position within the
+ * activity — the organizer (youth leader) is 001, participants follow.
  */
-const certificateNumber = (activityNumber: number, position: number) => `YLP/${pad(activityNumber)}/${pad(position)}`;
+const certificateNumber = (cohortNumber: number, activityNumber: number, position: number) =>
+  `YLP${cohortNumber}/${pad(activityNumber)}/${pad(position)}`;
+
+/** Activity counter per cohort. YLP 2.0 keeps the original counter so activities numbered before cohorts were added don't repeat. */
+const activityCounterId = (id: string) =>
+  id === FIRST_SYSTEM_COHORT.id ? "certificate-activities" : `certificate-activities-${id}`;
 
 /** Organizers first (youth leaders before anyone else), then participants by name. */
 function issueOrder(kindByUser: Map<string, CertificateKind>) {
@@ -47,27 +62,44 @@ function issueOrder(kindByUser: Map<string, CertificateKind>) {
 }
 
 /**
- * Issues certificates for a verified event: a participation certificate for
+ * Issues certificates for a verified activity: a participation certificate for
  * every participant and a leadership certificate for each organizer. Users who
- * already hold one for this event are skipped. Returns how many were issued.
+ * already hold one for this activity are skipped, as are RO and above. Only
+ * youth leaders' activities issue certificates — those run by an RO or above
+ * (trainings, meetings) issue none. Returns how many were issued.
  */
-export async function issueEventCertificates(event: Event, issuedById: string): Promise<number> {
-  const participantIds = event.evidence?.participantIds ?? [];
+export async function issueActivityCertificates(activity: Activity, issuedById: string): Promise<number> {
+  if (activity.organizerRole !== "youth-leader") return 0;
+
+  const participantIds = activity.evidence?.participantIds ?? [];
   const kindByUser = new Map<string, CertificateKind>();
   participantIds.forEach((id) => kindByUser.set(id, "participation"));
-  event.organizerIds.forEach((id) => kindByUser.set(id, "organizer"));
+  activity.organizerIds.forEach((id) => kindByUser.set(id, "organizer"));
 
   const userIds = [...kindByUser.keys()];
   const [recipients, existing, issuer] = await Promise.all([
     getDocsByIds<User>("users", userIds),
-    queryDocs<Certificate>(COLLECTION, [{ field: "eventId", operator: "==", value: event.id }]),
+    queryDocs<Certificate>(COLLECTION, [{ field: "eventId", operator: "==", value: activity.id }]),
     getDocById<User>("users", issuedById),
   ]);
   const alreadyIssued = new Set(existing.map((certificate) => certificate.userId));
-  const pending = recipients.filter((recipient) => !alreadyIssued.has(recipient.id)).sort(issueOrder(kindByUser));
+  const pending = recipients
+    .filter((recipient) => CERTIFIED_ROLES.includes(recipient.role) && !alreadyIssued.has(recipient.id))
+    .sort(issueOrder(kindByUser));
   if (pending.length === 0) return 0;
 
-  const activityNumber = await assignSequenceNumber("certificate-activities", "events", event.id, "certificateActivityNumber");
+  // An activity stays in the cohort it was first certified in, even if more certificates follow after a new cohort starts.
+  let cohortNumber = activity.certificateCohortNumber;
+  if (!cohortNumber) {
+    cohortNumber = (await getCurrentCohort()).number;
+    await updateDoc("events", activity.id, { certificateCohortNumber: cohortNumber });
+  }
+  const activityNumber = await assignSequenceNumber(
+    activityCounterId(cohortId(cohortNumber)),
+    "events",
+    activity.id,
+    "certificateActivityNumber"
+  );
   // Certificates added later (e.g. evidence re-verified with more participants) continue the activity's numbering.
   const lastPosition = existing.reduce((max, certificate) => Math.max(max, certificate.position ?? 0), 0);
   const issuedAt = new Date();
@@ -80,11 +112,11 @@ export async function issueEventCertificates(event: Event, issuedById: string): 
       recipientRole: recipient.role,
       kind,
       title: titles[kind],
-      eventId: event.id,
-      eventTitle: event.title,
-      eventLocation: event.location,
-      eventDate: toDate(event.startDate) ?? issuedAt,
-      certificateNumber: certificateNumber(activityNumber, lastPosition + index + 1),
+      eventId: activity.id,
+      eventTitle: activity.title,
+      eventLocation: activity.location,
+      eventDate: toDate(activity.startDate) ?? issuedAt,
+      certificateNumber: certificateNumber(cohortNumber, activityNumber, lastPosition + index + 1),
       activityNumber,
       position: lastPosition + index + 1,
       issuedBy: issuedById,
@@ -99,7 +131,7 @@ export async function issueEventCertificates(event: Event, issuedById: string): 
     newCertificates.map((certificate) => ({
       type: "set" as const,
       collection: COLLECTION,
-      docId: certificateId(event.id, certificate.userId),
+      docId: certificateId(activity.id, certificate.userId),
       data: certificate,
     }))
   );
@@ -107,9 +139,9 @@ export async function issueEventCertificates(event: Event, issuedById: string): 
   await createActivityLog({
     userId: issuedById,
     action: "certificate-issued",
-    description: `Issued ${newCertificates.length} certificate${newCertificates.length === 1 ? "" : "s"} for "${event.title}"`,
+    description: `Issued ${newCertificates.length} certificate${newCertificates.length === 1 ? "" : "s"} for "${activity.title}"`,
     entityType: "event",
-    entityId: event.id,
+    entityId: activity.id,
   });
 
   // Group by portal so each recipient's link opens their own Certificates page.
@@ -123,15 +155,17 @@ export async function issueEventCertificates(event: Event, issuedById: string): 
       notifyUsers(ids, {
         type: "certificate-issued",
         title: "You've earned a certificate",
-        message: `For "${event.title}" — view or download it from your Certificates page.`,
-        relatedId: event.id,
+        message: `For "${activity.title}" — view or download it from your Certificates page.`,
+        relatedId: activity.id,
         relatedType: "certificate",
         actionUrl: route || undefined,
       })
     )
-  ).catch((error) => logger.error(`Failed to notify certificate recipients for event ${event.id}`, error));
+  ).catch((error) => logger.error(`Failed to notify certificate recipients for activity ${activity.id}`, error));
 
-  logger.info(`Issued ${newCertificates.length} certificates for event ${event.id}`);
+  logger.info(`Issued ${newCertificates.length} certificates for activity ${activity.id}`);
+
+
   return newCertificates.length;
 }
 
@@ -158,18 +192,21 @@ export async function getCertificateForViewer(
 // ---------------------------------------------------------------------------
 // Team view (Head RO / SRO / RO)
 
+/** A certificate with its holder's current email (certificates don't store it). */
+export type TeamCertificate = Certificate & { recipientEmail: string };
+
 /** One verified activity's certificates, shown as a single row led by its organizer's certificate. */
 export interface TeamCertificateGroup {
-  eventId: string;
-  eventTitle: string;
-  eventLocation: string;
-  eventDate: Certificate["eventDate"];
+  activityId: string;
+  activityTitle: string;
+  activityLocation: string;
+  activityDate: Certificate["eventDate"];
   issuedAt: Certificate["issuedAt"];
   issuedByName: string;
   /** The organizer's (usually the youth leader's) certificate; a participant's if no organizer is in scope. */
-  lead: Certificate;
+  lead: TeamCertificate;
   /** Everyone in scope certified for this activity: organizers first, then participants by name. */
-  certificates: Certificate[];
+  certificates: TeamCertificate[];
   participantCount: number;
 }
 
@@ -207,17 +244,25 @@ export async function getTeamCertificates(viewer: { userId: string; role: UserRo
         .filter((certificate) => certificate.status === "issued");
     }
 
-    const byEvent = new Map<string, Certificate[]>();
-    certificates.forEach((certificate) => byEvent.set(certificate.eventId, [...(byEvent.get(certificate.eventId) ?? []), certificate]));
+    const holders = await getDocsByIds<User>("users", [...new Set(certificates.map((c) => c.userId))]);
+    const emailById = new Map(holders.map((holder) => [holder.id, holder.email]));
 
-    const groups: TeamCertificateGroup[] = [...byEvent.values()].map((list) => {
+    const byActivity = new Map<string, TeamCertificate[]>();
+    certificates.forEach((certificate) =>
+      byActivity.set(certificate.eventId, [
+        ...(byActivity.get(certificate.eventId) ?? []),
+        { ...certificate, recipientEmail: emailById.get(certificate.userId) ?? "" },
+      ])
+    );
+
+    const groups: TeamCertificateGroup[] = [...byActivity.values()].map((list) => {
       const sorted = [...list].sort(byLeadership);
       const lead = sorted[0];
       return {
-        eventId: lead.eventId,
-        eventTitle: lead.eventTitle,
-        eventLocation: lead.eventLocation,
-        eventDate: lead.eventDate,
+        activityId: lead.eventId,
+        activityTitle: lead.eventTitle,
+        activityLocation: lead.eventLocation,
+        activityDate: lead.eventDate,
         issuedAt: list.reduce((earliest, c) => (time(c.issuedAt) < time(earliest) ? c.issuedAt : earliest), lead.issuedAt),
         issuedByName: lead.issuedByName,
         lead,

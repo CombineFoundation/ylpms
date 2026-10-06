@@ -1,7 +1,7 @@
 import type { MemberRequestStatus } from "@/types/member-request.types";
 
 export const requestStatusLabels: Record<MemberRequestStatus, string> = {
-  pending: "Awaiting SRO approval",
+  pending: "Awaiting for approval",
   approved: "Approved",
   rejected: "Rejected",
 };

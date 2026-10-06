@@ -8,7 +8,9 @@ import { zodResolver } from "@/lib/zod-resolver";
 import { roleTitles } from "@/hooks/useCurrentProfile";
 import { Modal } from "@/components/ui/Modal";
 import { FieldError, SearchInput, inputClass } from "@/components/Head-of-RO/shared/ListParts";
-import { PdfAttachmentPicker } from "@/components/shared/PdfAttachmentPicker";
+import { AttachedPdfList, PdfAttachmentPicker, ReviewerFeedback } from "@/components/shared/PdfAttachmentPicker";
+import { MAX_REPORT_ATTACHMENTS } from "@/lib/report-attachments";
+import type { ReportAttachment } from "@/types/report.types";
 import { runWorkflow, withScope, type ActivityScope } from "./activity.api";
 import { evidenceFormSchema, usesWorkflow, type ApiActivity, type ApiActivityDetail, type EvidenceForm } from "./activity.types";
 
@@ -27,6 +29,7 @@ export function EvidenceModal({ activity, scope, onClose, onSubmitted }: Evidenc
   const [detail, setDetail] = useState<ApiActivityDetail | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [files, setFiles] = useState<File[]>([]);
+  const [kept, setKept] = useState<ReportAttachment[]>([]);
   const [search, setSearch] = useState("");
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [progress, setProgress] = useState<string | null>(null);
@@ -46,11 +49,13 @@ export function EvidenceModal({ activity, scope, onClose, onSubmitted }: Evidenc
     setDetail(null);
     setLoadError(null);
     setFiles([]);
+    // Evidence that was returned keeps its PDFs unless they're removed.
+    setKept(activity.evidence?.attachments ?? []);
     setSearch("");
     setSubmitError(null);
     reset({ summary: activity.evidence?.summary ?? "", participantIds: [] });
     let cancelled = false;
-    apiFetch<ApiActivityDetail>(withScope(`/api/events/${activity.id}`, scope))
+    apiFetch<ApiActivityDetail>(withScope(`/api/activities/${activity.id}`, scope))
       .then((loaded) => {
         if (cancelled) return;
         setDetail(loaded);
@@ -82,7 +87,7 @@ export function EvidenceModal({ activity, scope, onClose, onSubmitted }: Evidenc
     setSubmitError(null);
     try {
       const actingAs = scope.portal !== "head-ro" && scope.selectedId ? { role: scope.portal, id: scope.selectedId } : null;
-      const attachments = [];
+      const attachments = [...kept];
       for (const [index, file] of files.entries()) {
         setProgress(`Uploading PDF ${index + 1} of ${files.length}...`);
         attachments.push(await uploadReportPdf(file, actingAs));
@@ -96,7 +101,7 @@ export function EvidenceModal({ activity, scope, onClose, onSubmitted }: Evidenc
       onSubmitted(
         usesWorkflow(activity)
           ? `Evidence for "${activity.title}" was sent for verification.`
-          : `"${activity.title}" is complete and certificates were issued.`
+          : `"${activity.title}" is complete.`
       );
     } catch (error) {
       setSubmitError(errorMessage(error, "Unable to submit evidence."));
@@ -112,13 +117,20 @@ export function EvidenceModal({ activity, scope, onClose, onSubmitted }: Evidenc
       description={
         activity && usesWorkflow(activity)
           ? "Your RO verifies it; once verified, every participant receives a certificate."
-          : "Once submitted, the activity is completed and every participant receives a certificate."
+          : "Once submitted, the activity is completed. Trainings and meetings don't issue certificates."
       }
       onClose={onClose}
       isBusy={isSubmitting}
       size="lg"
     >
       <form onSubmit={onSubmit} className="space-y-4" noValidate>
+        {/* An "ongoing" activity with a comment had its evidence returned (the comment is cleared on start). */}
+        {activity?.status === "ongoing" && (
+          <ReviewerFeedback
+            title={`${activity.reviewedByName || "Your reviewer"} returned the evidence`}
+            message={activity.reviewComment}
+          />
+        )}
         <label className="block text-sm font-medium text-gray-700">
           What happened
           <textarea
@@ -160,7 +172,7 @@ export function EvidenceModal({ activity, scope, onClose, onSubmitted }: Evidenc
                         type="checkbox"
                         checked={selected.includes(person.id)}
                         onChange={() => toggle(person.id)}
-                        className="h-4 w-4 rounded border-gray-300 accent-orange-500"
+                        className="h-4 w-4 rounded border-gray-300 accent-brand"
                       />
                       <span className="flex-1 text-gray-800">{person.name}</span>
                       <span className="text-xs text-gray-400">
@@ -177,7 +189,14 @@ export function EvidenceModal({ activity, scope, onClose, onSubmitted }: Evidenc
           <FieldError message={errors.participantIds?.message} />
         </fieldset>
 
-        <PdfAttachmentPicker files={files} onChange={setFiles} disabled={isSubmitting} label="Evidence PDFs" />
+        <AttachedPdfList attachments={kept} onChange={setKept} disabled={isSubmitting} />
+        <PdfAttachmentPicker
+          files={files}
+          onChange={setFiles}
+          disabled={isSubmitting}
+          label={kept.length ? "Add more evidence PDFs" : "Evidence PDFs"}
+          maxFiles={MAX_REPORT_ATTACHMENTS - kept.length}
+        />
 
         {progress && isSubmitting && <p className="text-sm text-gray-500">{progress}</p>}
         {submitError && (

@@ -34,6 +34,16 @@ export function SessionGuard() {
         try {
           const body = await response.clone().json();
           if (body?.error?.code === "ACCOUNT_DISABLED") forceLogout("disabled");
+          else if (body?.error?.code === "COHORT_CLOSED") {
+            // Only certificates stay open after a cohort ends; the portal is the first part of the path.
+            const portal = window.location.pathname.split("/")[1];
+            if (portal && !window.location.pathname.endsWith("/certificates")) {
+              window.location.assign(`/${portal}/certificates`);
+            }
+          } else if (body?.error?.code === "PASSWORD_CHANGE_REQUIRED" && window.location.pathname !== "/change-password") {
+            const next = encodeURIComponent(window.location.pathname + window.location.search);
+            window.location.assign(`/change-password?next=${next}`);
+          }
         } catch {
           // Not JSON — an ordinary permission error, nothing to do.
         }

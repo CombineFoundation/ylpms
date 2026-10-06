@@ -17,12 +17,12 @@ export interface HeadROAnalyticsSummary {
   months: number;
   stats: {
     totalUsers: StatWithDelta;
-    eventsThisMonth: StatWithDelta;
+    activitiesThisMonth: StatWithDelta;
     reportsFiled: StatWithDelta;
     tasksCompleted: StatWithDelta;
   };
   userGrowth: { month: string; value: number }[];
-  eventsPerMonth: { month: string; value: number }[];
+  activitiesPerMonth: { month: string; value: number }[];
   volunteersByRegion: { name: string; value: number; color: string }[];
 }
 
@@ -41,13 +41,13 @@ async function countNonDeveloperUsers(until?: Date, since?: Date): Promise<numbe
   return all - developers;
 }
 
-/** Events that actually got scheduled (not drafts, rejected proposals or ones still awaiting approval). */
-const SCHEDULED_EVENT_STATUSES = ["planned", "ongoing", "evidence-submitted", "completed", "cancelled"];
+/** Activities that actually got scheduled (not drafts, rejected proposals or ones still awaiting approval). */
+const SCHEDULED_ACTIVITY_STATUSES = ["planned", "ongoing", "evidence-submitted", "completed", "cancelled"];
 
-function countEventsStartingBetween(start: Date, end: Date) {
-  // Uses the events (status, startDate) composite index.
+function countActivitiesStartingBetween(start: Date, end: Date) {
+  // Uses the activities (status, startDate) composite index.
   return getDocCount("events", [
-    { field: "status", operator: "in", value: SCHEDULED_EVENT_STATUSES },
+    { field: "status", operator: "in", value: SCHEDULED_ACTIVITY_STATUSES },
     { field: "startDate", operator: ">=", value: start },
     { field: "startDate", operator: "<=", value: end },
   ]);
@@ -68,8 +68,8 @@ export async function getHeadROAnalyticsSummary(months: AnalyticsRange = 6): Pro
     const [
       totalUsers,
       newUsersThisMonth,
-      eventsThisMonth,
-      eventsLastMonth,
+      activitiesThisMonth,
+      activitiesLastMonth,
       allReports,
       draftReports,
       reportsThisMonth,
@@ -77,13 +77,13 @@ export async function getHeadROAnalyticsSummary(months: AnalyticsRange = 6): Pro
       tasksCompleted,
       tasksCompletedThisMonth,
       userGrowth,
-      eventsPerMonth,
+      activitiesPerMonth,
       volunteerRegions,
     ] = await Promise.all([
       countNonDeveloperUsers(),
       countNonDeveloperUsers(undefined, thisMonth.monthStart),
-      countEventsStartingBetween(thisMonth.monthStart, thisMonth.monthEnd),
-      countEventsStartingBetween(lastMonthStart, lastMonthEnd),
+      countActivitiesStartingBetween(thisMonth.monthStart, thisMonth.monthEnd),
+      countActivitiesStartingBetween(lastMonthStart, lastMonthEnd),
       getDocCount("reports"),
       getDocCount("reports", [{ field: "status", operator: "==", value: "draft" }]),
       getDocCount("reports", [{ field: "createdAt", operator: ">=", value: thisMonth.monthStart }]),
@@ -100,7 +100,7 @@ export async function getHeadROAnalyticsSummary(months: AnalyticsRange = 6): Pro
         { field: "completedDate", operator: ">=", value: thisMonth.monthStart },
       ]),
       Promise.all(buckets.map(({ monthEnd }) => countNonDeveloperUsers(monthEnd))),
-      Promise.all(buckets.map(({ monthStart, monthEnd }) => countEventsStartingBetween(monthStart, monthEnd))),
+      Promise.all(buckets.map(({ monthStart, monthEnd }) => countActivitiesStartingBetween(monthStart, monthEnd))),
       selectFields<{ region?: string }>("users", [{ field: "role", operator: "==", value: "volunteer" }], ["region"]),
     ]);
 
@@ -113,9 +113,9 @@ export async function getHeadROAnalyticsSummary(months: AnalyticsRange = 6): Pro
       months,
       stats: {
         totalUsers: { total: totalUsers, change: newUsersThisMonth, changeLabel: "this month" },
-        eventsThisMonth: {
-          total: eventsThisMonth,
-          change: eventsThisMonth - eventsLastMonth,
+        activitiesThisMonth: {
+          total: activitiesThisMonth,
+          change: activitiesThisMonth - activitiesLastMonth,
           changeLabel: "vs last month",
         },
         // Drafts haven't been filed yet, so they don't count.
@@ -127,7 +127,7 @@ export async function getHeadROAnalyticsSummary(months: AnalyticsRange = 6): Pro
         tasksCompleted: { total: tasksCompleted, change: tasksCompletedThisMonth, changeLabel: "this month" },
       },
       userGrowth: buckets.map(({ label }, index) => ({ month: label, value: userGrowth[index] })),
-      eventsPerMonth: buckets.map(({ label }, index) => ({ month: label, value: eventsPerMonth[index] })),
+      activitiesPerMonth: buckets.map(({ label }, index) => ({ month: label, value: activitiesPerMonth[index] })),
       volunteersByRegion: buildRegionBreakdown(volunteerRegions),
     };
   } catch (error) {

@@ -58,6 +58,7 @@ export function VolunteerList() {
           phone: values.phone || undefined,
           region: values.region,
           university: values.university,
+          teamRole: values.teamRole,
         },
       });
       requests.setData((current) => [created, ...(current ?? [])]);
@@ -97,7 +98,7 @@ export function VolunteerList() {
               setFormError(null);
               setIsAdding(true);
             }}
-            className="flex items-center gap-1.5 rounded-lg bg-orange-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-orange-600"
+            className="flex items-center gap-1.5 rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-dark"
           >
             <Plus size={15} />
             Add Volunteer
@@ -141,6 +142,7 @@ export function VolunteerList() {
         isOpen={isAdding}
         title="Add Volunteer"
         approver="RO"
+        askForTeamRole
         error={formError}
         onClose={() => setIsAdding(false)}
         onSubmit={handleAdd}

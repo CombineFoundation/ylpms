@@ -75,7 +75,9 @@ export function ActivityFormModal({ isOpen, editing, needsApproval, error, onClo
       description={
         !editing && needsApproval
           ? "It's saved as a draft. Submit it when it's ready, and your RO will review and approve it."
-          : undefined
+          : editing && needsApproval && editing.status === "planned"
+            ? "It's already approved: saving changes sends it back to your RO for approval, and everyone signed up is told."
+            : undefined
       }
       onClose={onClose}
       isBusy={isSubmitting}

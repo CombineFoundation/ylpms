@@ -8,6 +8,7 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { FilterPills, emptyMessage } from "@/components/Head-of-RO/shared/ListParts";
 import type { ApiMemberRequest, MemberRequestRole, MemberRequestStatus } from "@/types/member-request.types";
 import { ApprovalTable } from "./ApprovalTable";
+import { MemberRequestDetails } from "./MemberRequestDetails";
 import { memberIdSchema } from "@/utils/member-id";
 
 /** Approved requests leave this section: they show up as members in the table below it. */
@@ -98,10 +99,10 @@ export function MemberApprovals({ role, onApproved }: { role: MemberRequestRole;
     <section className="overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm">
       <div className="flex flex-col gap-3 border-b border-gray-100 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex items-center gap-2">
-          <UserCheck className="h-4 w-4 text-orange-500" />
+          <UserCheck className="h-4 w-4 text-brand" />
           <h2 className="text-sm font-semibold text-gray-700">Approval requests</h2>
           {pendingCount > 0 && (
-            <span className="rounded-full bg-orange-500 px-2 py-0.5 text-[11px] font-semibold text-white">
+            <span className="rounded-full bg-brand px-2 py-0.5 text-[11px] font-semibold text-white">
               {pendingCount} awaiting you
             </span>
           )}
@@ -137,13 +138,16 @@ export function MemberApprovals({ role, onApproved }: { role: MemberRequestRole;
         isOpen={!!pending}
         title={isReject ? `Reject ${config.noun} request?` : `Approve ${config.noun}?`}
         message={
-          <>
-            <span className="font-medium text-gray-800">{pending?.request.name}</span> ({pending?.request.email}
-            {pending?.request.memberId ? ` · ID ${pending.request.memberId}` : ""}), requested by {pending?.request.requestedByName}.{" "}
-            {isReject
-              ? `The ${config.requester} will see your reason. No account will be created.`
-              : `Their account will be created under this ${config.requester} and sign-in details emailed to them.`}
-          </>
+          pending && (
+            <div className="space-y-3">
+              <MemberRequestDetails request={pending.request} noun={config.noun} />
+              <p>
+                {isReject
+                  ? `The ${config.requester} will see your reason. No account will be created.`
+                  : `Their account will be created under this ${config.requester} and sign-in details emailed to them.`}
+              </p>
+            </div>
+          )
         }
         confirmLabel={isReject ? "Reject" : "Approve & create account"}
         tone={isReject ? "danger" : "primary"}

@@ -65,7 +65,7 @@ const COPY: Record<ActivityPortal, { title: string; description: string; empty: 
   },
 };
 
-/** The activity / events board for any portal (Head RO, SRO, RO, youth leader, volunteer). */
+/** The activities board for any portal (Head RO, SRO, RO, youth leader, volunteer). */
 export function ActivityBoard({ portal }: { portal: ActivityPortal }) {
   return portal === "head-ro" ? <HeadROBoard /> : <ScopedBoard portal={portal} />;
 }
@@ -91,7 +91,7 @@ function BoardView({ scope, isReady, scopeError }: { scope: ActivityScope; isRea
   const tab = tabs.find((t) => t.value === tabValue) ?? tabs[0];
 
   const list = usePagedList<ApiActivity>(
-    (page) => withScope(`/api/events?view=${tab.view}&when=${tab.when}&pageSize=24&pageNumber=${page}`, scope),
+    (page) => withScope(`/api/activities?view=${tab.view}&when=${tab.when}&pageSize=24&pageNumber=${page}`, scope),
     `activities:${portal}:${tab.value}:${scope.selectedId ?? ""}`,
     "Unable to load activities.",
     isReady
@@ -178,7 +178,8 @@ function BoardView({ scope, isReady, scopeError }: { scope: ActivityScope; isRea
           {portal === "ro" && (
             <p className="mt-2 text-xs text-gray-400">
               Your youth leaders submit activities to you: approve or send them back, then verify their evidence to issue
-              certificates. Activities you create are approved straight away and complete when you submit their evidence.
+              certificates. Activities you create are approved straight away, complete when you submit their evidence, and don&apos;t
+              issue certificates.
             </p>
           )}
         </div>

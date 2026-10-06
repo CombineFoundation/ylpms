@@ -1,6 +1,6 @@
 "use client";
 
-import { ApiError, getAuthToken } from "@/lib/api-client";
+import { ApiError, apiFetch } from "@/lib/api-client";
 import { SCOPE_PARAM, type ScopedRole } from "@/utils/portal-scope";
 import type { ReportAttachment } from "@/types/report.types";
 
@@ -22,28 +22,35 @@ export function pdfFileError(file: File): string | null {
   return null;
 }
 
+type UploadTicket = { uploadUrl: string; uploadPath: string; headers: Record<string, string> };
+
 /**
- * Uploads one PDF (for a report, or an activity's evidence); `actingAs` is set
- * when a developer is acting as that portal's user.
+ * Uploads one file straight to Storage, so large files don't pass through our
+ * API: `${apiPath}/upload-url` signs the upload, the file is PUT there, then
+ * `apiPath` checks it and returns what to attach. `query` is appended to both.
  */
-export async function uploadReportPdf(
+export async function uploadDirect<T>(file: File, apiPath: string, query = ""): Promise<T> {
+  const ticket = await apiFetch<UploadTicket>(`${apiPath}/upload-url${query}`, {
+    method: "POST",
+    body: { name: file.name, size: file.size },
+  });
+  const response = await fetch(ticket.uploadUrl, { method: "PUT", headers: ticket.headers, body: file }).catch(() => null);
+  if (!response?.ok) {
+    throw new ApiError(`Couldn't upload "${file.name}". Check your connection and try again.`, response?.status ?? 0);
+  }
+  return apiFetch<T>(`${apiPath}${query}`, { method: "POST", body: { uploadPath: ticket.uploadPath, name: file.name } });
+}
+
+/**
+ * Uploads one PDF (for a report, a task submission or an activity's evidence);
+ * `actingAs` is set when a developer is acting as that portal's user.
+ */
+export function uploadReportPdf(
   file: File,
   actingAs: { role: ScopedRole; id: string } | null = null
 ): Promise<ReportAttachment> {
-  const token = await getAuthToken();
-  const body = new FormData();
-  body.append("file", file);
   const query = actingAs ? `?${SCOPE_PARAM[actingAs.role]}=${encodeURIComponent(actingAs.id)}` : "";
-  const response = await fetch(`/api/reports/attachments${query}`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${token}` },
-    body,
-  });
-  const result = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    throw new ApiError(result.error?.message || `Couldn't upload "${file.name}".`, response.status, result.error?.code);
-  }
-  return result.data as ReportAttachment;
+  return uploadDirect<ReportAttachment>(file, "/api/reports/attachments", query);
 }
 
 /** Opens an attached report PDF in a new tab. */
@@ -57,32 +64,17 @@ export function openAuthenticatedPdf(path: string) {
 }
 
 /**
- * Opens a file served by our API. Without `downloadName` it opens in a new tab
- * (opened synchronously, inside the click, so popup blockers allow it, then
- * pointed at the downloaded file); with one it's saved under that name instead.
+ * Opens a file whose short-lived link our API gives at `path`. It opens in a
+ * new tab (opened synchronously, inside the click, so popup blockers allow it,
+ * then pointed at the link); with `download` the link saves the file instead,
+ * so no tab is needed.
  */
-export async function openAuthenticatedFile(path: string, downloadName?: string) {
-  const tab = downloadName ? null : window.open("", "_blank");
+export async function openAuthenticatedFile(path: string, download = false) {
+  const tab = download ? null : window.open("", "_blank");
   try {
-    const token = await getAuthToken();
-    const response = await fetch(path, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (!response.ok) {
-      const result = await response.json().catch(() => ({}));
-      throw new Error(result.error?.message || "Couldn't open this file.");
-    }
-    const url = URL.createObjectURL(await response.blob());
-    if (downloadName) {
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = downloadName;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-    } else if (tab) tab.location.href = url;
+    const { url } = await apiFetch<{ url: string }>(path);
+    if (tab) tab.location.href = url;
     else window.location.href = url;
-    setTimeout(() => URL.revokeObjectURL(url), 60_000);
   } catch (error) {
     tab?.close();
     throw error;

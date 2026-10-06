@@ -7,6 +7,7 @@ import { FIRST_SYSTEM_COHORT, cohortId, cohortName } from "@/config/cohorts";
 import { createActivityLog } from "./activitylog.service";
 import type { ApiCohort, Cohort } from "@/types/cohort.types";
 import type { UserRole } from "@/types/user.types";
+import { formatDate } from "@/utils/format-date";
 
 /**
  * Cohorts - YLP 2.0, YLP 3.0, … The latest one is "current": new youth
@@ -71,24 +72,31 @@ export function toApiCohort(cohort: Cohort, now = new Date()): ApiCohort {
   };
 }
 
-const formatPktDate = (date: Date) =>
-  date.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Karachi" });
+const formatPktDate = (date: Date) => formatDate(date);
+
+/** A youth leader's or volunteer's access window. Once `closed`, only their certificates stay available. */
+export type CohortAccess = { closed: boolean; endsAt: Date | null; message: string | null };
+
+const CLOSED_SUFFIX = "so your access is limited to downloading your certificates.";
 
 /**
- * Why a youth leader or volunteer can't use the portal, or null if they can.
- * Accounts from before cohorts were recorded belong to YLP 2.0.
+ * Whether a youth leader's or volunteer's cohort is still running (null for
+ * other roles). Accounts from before cohorts were recorded belong to YLP 2.0.
  */
-export async function cohortAccessError(role: UserRole, memberCohortId: string | undefined): Promise<string | null> {
+export async function cohortAccessFor(role: UserRole, memberCohortId: string | undefined): Promise<CohortAccess | null> {
   if (!COHORT_ROLES.includes(role)) return null;
   const current = await getCurrentCohort();
   const ownId = memberCohortId || FIRST_SYSTEM_COHORT.id;
   if (ownId !== current.id) {
     const number = Number(ownId.replace(/^ylp-/, ""));
-    return `${Number.isFinite(number) ? cohortName(number) : "Your cohort"} has ended, so your access has closed.`;
+    const name = Number.isFinite(number) ? cohortName(number) : "Your cohort";
+    return { closed: true, endsAt: null, message: `${name} has ended, ${CLOSED_SUFFIX}` };
   }
   const end = toDate(current.endDate)!;
-  if (new Date() > end) return `${current.name} ended on ${formatPktDate(end)}, so your access has closed.`;
-  return null;
+  if (new Date() > end) {
+    return { closed: true, endsAt: end, message: `${current.name} ended on ${formatPktDate(end)}, ${CLOSED_SUFFIX}` };
+  }
+  return { closed: false, endsAt: end, message: null };
 }
 
 /** Writes the built-in YLP 2.0 record the first time it's changed. */

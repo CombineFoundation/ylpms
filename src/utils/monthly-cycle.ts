@@ -5,6 +5,8 @@
  * Kept free of server-only imports so the UI can label months the same way.
  */
 
+import { formatDate } from "./format-date";
+
 const PKT_OFFSET_MS = 5 * 60 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -40,8 +42,7 @@ const cycleBoundary = (cohort: CycleCohort, monthsAfterStart: number) => {
   return new Date(Date.UTC(start.year, start.monthIndex + monthsAfterStart, start.day) - PKT_OFFSET_MS);
 };
 
-const shortDate = (date: Date) =>
-  date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "Asia/Karachi" });
+const shortDate = (date: Date) => formatDate(date);
 
 export function cycleByNumber(number: number, cohort: CycleCohort = YLP_2): MonthlyCycle {
   const start = cycleBoundary(cohort, number - 1);

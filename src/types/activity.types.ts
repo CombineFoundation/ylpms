@@ -7,13 +7,13 @@ import type { UserRole } from "./user.types";
  * Submit Evidence → Verify → Certificates.
  *
  * - draft / submitted / rejected: a youth leader's proposal, awaiting their
- *   manager's approval (events organized by an RO or above skip straight to planned).
+ *   manager's approval (activities organized by an RO or above skip straight to planned).
  * - planned: approved and open for sign-ups.
  * - ongoing: being conducted.
  * - evidence-submitted: the organizer has reported who took part, awaiting verification.
  * - completed: verified; participation certificates have been issued.
  */
-export type EventStatus =
+export type ActivityStatus =
   | "draft"
   | "submitted"
   | "rejected"
@@ -23,13 +23,13 @@ export type EventStatus =
   | "completed"
   | "cancelled";
 
-export type EventType = "workshop" | "training" | "meeting" | "volunteer-event" | "other";
+export type ActivityType = "workshop" | "training" | "meeting" | "volunteer-event" | "other";
 
 /** Held in person, or online (a webinar). Activities from before this was recorded count as onsite. */
-export type EventMode = "onsite" | "online";
+export type ActivityMode = "onsite" | "online";
 
 /** What the organizer reports after conducting the activity. */
-export interface EventEvidence {
+export interface ActivityEvidence {
   summary: string;
   /** Users who actually took part; each gets a participation certificate on verification. */
   participantIds: string[];
@@ -39,13 +39,13 @@ export interface EventEvidence {
   submittedAt: Timestamp | Date;
 }
 
-export interface Event {
+export interface Activity {
   id: string;
   title: string;
   description: string;
-  type: EventType;
-  mode?: EventMode;
-  status: EventStatus;
+  type: ActivityType;
+  mode?: ActivityMode;
+  status: ActivityStatus;
   startDate: Timestamp | Date;
   endDate: Timestamp | Date;
   location: string;
@@ -61,20 +61,24 @@ export interface Event {
   reviewedByName?: string;
   reviewedAt?: Timestamp | Date;
   reviewComment?: string;
-  evidence?: EventEvidence;
+  evidence?: ActivityEvidence;
   certificatesIssuedAt?: Timestamp | Date;
-  /** Given the first time the activity issues certificates; the middle part of "YLP/007/001". */
+  /** Given the first time the activity issues certificates, counting from 1 in each cohort; the "007" of "YLP2/007/001". */
   certificateActivityNumber?: number;
+  /** The cohort (2 for YLP 2.0) the activity was first certified in; the "2" of "YLP2/007/001". */
+  certificateCohortNumber?: number;
   certificateCount?: number;
+  /** Set while an approved activity whose organizer changed it waits to be approved again. */
+  reapproval?: boolean;
   createdAt: Timestamp | Date;
   updatedAt: Timestamp | Date;
 }
 
-export interface CreateEventRequest {
+export interface CreateActivityRequest {
   title: string;
   description: string;
-  type: EventType;
-  mode: EventMode;
+  type: ActivityType;
+  mode: ActivityMode;
   startDate: Date;
   endDate: Date;
   location: string;
@@ -82,11 +86,11 @@ export interface CreateEventRequest {
   image?: File;
 }
 
-export interface UpdateEventRequest {
+export interface UpdateActivityRequest {
   title?: string;
   description?: string;
-  type?: EventType;
-  mode?: EventMode;
+  type?: ActivityType;
+  mode?: ActivityMode;
   startDate?: Date;
   endDate?: Date;
   location?: string;
@@ -94,8 +98,9 @@ export interface UpdateEventRequest {
   maxAttendees?: number | null;
 }
 
-export type EventWorkflowAction =
+export type ActivityWorkflowAction =
   | "submit"
+  | "withdraw"
   | "approve"
   | "reject"
   | "start"
@@ -104,11 +109,13 @@ export type EventWorkflowAction =
   | "verify"
   | "cancel";
 
-/** What the signed-in user (or the portal user a developer acts as) may do with an event. */
-export interface EventPermissions {
+/** What the signed-in user (or the portal user a developer acts as) may do with an activity. */
+export interface ActivityPermissions {
   canEdit: boolean;
   canDelete: boolean;
   canSubmit: boolean;
+  /** The organizer takes a proposal awaiting approval back to draft. */
+  canWithdraw: boolean;
   canReview: boolean;
   canStart: boolean;
   canSubmitEvidence: boolean;
@@ -119,14 +126,14 @@ export interface EventPermissions {
   canViewEvidence: boolean;
 }
 
-/** An event as list endpoints return it: names resolved and permissions computed server-side. */
-export type EventListItem = Event & {
+/** An activity as list endpoints return it: names resolved and permissions computed server-side. */
+export type ActivityListItem = Activity & {
   organizerName: string;
   attendeeCount: number;
   isAttending: boolean;
   isOrganizer: boolean;
-  permissions: EventPermissions;
+  permissions: ActivityPermissions;
 };
 
 /** Approved activities still to run (or running): tasks can be linked to these until they end. */
-export const OPEN_ACTIVITY_STATUSES: EventStatus[] = ["planned", "ongoing"];
+export const OPEN_ACTIVITY_STATUSES: ActivityStatus[] = ["planned", "ongoing"];

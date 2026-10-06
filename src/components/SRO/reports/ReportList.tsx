@@ -11,6 +11,7 @@ import { TeamReports } from "./TeamReports";
 import { MyReports } from "./MyReports";
 import { SubmitReportModal } from "./SubmitReportModal";
 import { toReportPayload, type SubmitReportForm } from "./submit-report.types";
+import type { ReportAttachment } from "@/types/report.types";
 
 type Tab = "team" | "mine";
 
@@ -40,6 +41,8 @@ export function TeamReportList({ portal }: { portal: ReportingRole }) {
   const myReports = useMemo(() => mine.data ?? [], [mine.data]);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  /** A returned report being edited and resubmitted (null: a new report). */
+  const [editing, setEditing] = useState<ApiReport | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [progress, setProgress] = useState<string | null>(null);
@@ -51,23 +54,24 @@ export function TeamReportList({ portal }: { portal: ReportingRole }) {
   ];
   const intro = hasTeam ? `${teamCopy[portal]} and submit your own to the ${reviewer}` : `Submit your reports to the ${reviewer}`;
 
-  const handleSubmit = async (values: SubmitReportForm, files: File[]) => {
+  const handleSubmit = async (values: SubmitReportForm, files: File[], kept: ReportAttachment[]) => {
     setFormError(null);
     try {
-      const attachments = [];
+      const attachments = [...kept];
       for (const [index, file] of files.entries()) {
         setProgress(`Uploading PDF ${index + 1} of ${files.length}...`);
         attachments.push(await uploadReportPdf(file, selectedId ? { role: portal, id: selectedId } : null));
       }
       setProgress(files.length ? "Submitting report..." : null);
       const payload = toReportPayload(values);
-      await apiFetch(scopedPath("/api/reports", portal, selectedId), {
-        method: "POST",
+      await apiFetch(scopedPath(editing ? `/api/reports/${editing.id}` : "/api/reports", portal, selectedId), {
+        method: editing ? "PUT" : "POST",
         body: { ...payload, content: { ...payload.content, attachments } },
       });
       setIsSubmitting(false);
       setTab("mine");
-      setNotice(`"${values.title}" was submitted to the ${reviewer} for review.`);
+      setNotice(`"${values.title}" was ${editing ? "resubmitted" : "submitted"} to the ${reviewer} for review.`);
+      setEditing(null);
       mine.reload();
     } catch (error) {
       setFormError(errorMessage(error, "Unable to submit this report."));
@@ -86,6 +90,7 @@ export function TeamReportList({ portal }: { portal: ReportingRole }) {
             type="button"
             onClick={() => {
               setFormError(null);
+              setEditing(null);
               setIsSubmitting(true);
             }}
             className="flex items-center gap-1.5 rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark"
@@ -110,7 +115,17 @@ export function TeamReportList({ portal }: { portal: ReportingRole }) {
         <TeamReports portal={portal} />
       ) : (
         <div className="overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm">
-          <MyReports reports={myReports} isLoading={mine.isLoading} error={mine.error} reviewer={reviewer} />
+          <MyReports
+            reports={myReports}
+            isLoading={mine.isLoading}
+            error={mine.error}
+            reviewer={reviewer}
+            onResubmit={(report) => {
+              setFormError(null);
+              setEditing(report);
+              setIsSubmitting(true);
+            }}
+          />
         </div>
       )}
 
@@ -119,6 +134,7 @@ export function TeamReportList({ portal }: { portal: ReportingRole }) {
         error={formError}
         progress={progress}
         reviewer={reviewer}
+        editing={editing}
         onClose={() => setIsSubmitting(false)}
         onSubmit={handleSubmit}
       />

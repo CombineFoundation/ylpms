@@ -10,7 +10,7 @@ import { apiError, apiSuccess, parsePagination } from "@/utils/api-response";
 import { TaskStatus } from "@/types/task.types";
 
 const STATUS_FILTERS = [
-  "assigned",
+  "assigned", // shown as "Pending"
   "in-progress",
   "submitted",
   "changes-requested",

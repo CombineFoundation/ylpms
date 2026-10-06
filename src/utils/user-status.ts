@@ -5,6 +5,8 @@
  * Inactive  – deactivated (stored status "inactive"); can't sign in
  * Suspended – suspended by a manager; can't sign in
  */
+import { formatDayMonth, formatMonthYear } from "./format-date";
+
 export type DisplayStatus = "Active" | "Idle" | "Pending" | "Inactive" | "Suspended";
 
 export const DISPLAY_STATUSES: DisplayStatus[] = ["Active", "Idle", "Pending", "Inactive", "Suspended"];
@@ -85,9 +87,7 @@ export function getInitials(name: string) {
 
 export function formatJoinedDate(value?: TimestampInput): string {
   const date = timestampToDate(value);
-  return date
-    ? date.toLocaleDateString(undefined, { month: "short", year: "numeric" })
-    : "-";
+  return formatMonthYear(date);
 }
 
 export function formatRelativeTime(value?: TimestampInput): string {
@@ -106,5 +106,5 @@ export function formatRelativeTime(value?: TimestampInput): string {
   const days = Math.floor(hours / 24);
   if (days < 7) return `${days}d ago`;
 
-  return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  return formatDayMonth(date);
 }

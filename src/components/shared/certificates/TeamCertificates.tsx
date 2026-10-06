@@ -1,11 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Award, Eye } from "lucide-react";
+import { Award, Download, Eye } from "lucide-react";
 import { apiFetch, errorMessage } from "@/lib/api-client";
 import { usePortalData } from "@/hooks/usePortalScope";
 import { PageHeader, SearchInput, TableMessageRow, emptyMessage } from "@/components/Head-of-RO/shared/ListParts";
-import { formatCertificateDate, roleLabels, type ApiTeamCertificateGroup, type ApiTeamCertificates } from "./certificate.types";
+import { exportActivityCertificatesCsv, formatCertificateDate, roleLabels, type ApiTeamCertificateGroup, type ApiTeamCertificates } from "./certificate.types";
 import { TeamCertificateDetailModal } from "./TeamCertificateDetailModal";
 
 type TeamPortal = "head-ro" | "sro" | "ro";
@@ -64,7 +64,7 @@ function CertificatesView({ portal, loaded }: { portal: TeamPortal; loaded: Load
     const q = search.trim().toLowerCase();
     if (!q) return groups;
     return groups.filter((group) =>
-      [group.eventTitle, group.eventLocation, ...group.certificates.flatMap((c) => [c.recipientName, c.certificateNumber])].some(
+      [group.activityTitle, group.activityLocation, ...group.certificates.flatMap((c) => [c.recipientName, c.certificateNumber])].some(
         (value) => value?.toLowerCase().includes(q)
       )
     );
@@ -114,16 +114,16 @@ function CertificatesView({ portal, loaded }: { portal: TeamPortal; loaded: Load
               {!isLoading &&
                 !error &&
                 filtered.map((group) => (
-                  <tr key={group.eventId} className="hover:bg-gray-50/60">
+                  <tr key={group.activityId} className="hover:bg-gray-50/60">
                     <td className="px-5 py-3.5">
-                      <p className="font-medium text-gray-900">{group.eventTitle}</p>
+                      <p className="font-medium text-gray-900">{group.activityTitle}</p>
                       <p className="text-xs text-gray-400">
-                        {group.eventLocation || "—"} · {formatCertificateDate(group.eventDate)}
+                        {group.activityLocation || "—"} · {formatCertificateDate(group.activityDate)}
                       </p>
                     </td>
                     <td className="px-4 py-3.5">
                       <p className="flex items-center gap-1.5 font-medium text-gray-800">
-                        <Award className="h-4 w-4 shrink-0 text-orange-500" />
+                        <Award className="h-4 w-4 shrink-0 text-brand" />
                         {group.lead.recipientName}
                       </p>
                       <p className="text-xs text-gray-400">
@@ -136,14 +136,26 @@ function CertificatesView({ portal, loaded }: { portal: TeamPortal; loaded: Load
                     </td>
                     <td className="whitespace-nowrap px-4 py-3.5 text-gray-500">{formatCertificateDate(group.issuedAt)}</td>
                     <td className="px-4 py-3.5 text-right">
-                      <button
-                        type="button"
-                        onClick={() => setViewing(group)}
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:border-brand hover:text-brand"
-                      >
-                        <Eye className="h-3.5 w-3.5" />
-                        View details
-                      </button>
+                      <div className="inline-flex items-center gap-2">
+                        {portal === "head-ro" && (
+                          <button
+                            type="button"
+                            onClick={() => exportActivityCertificatesCsv(group)}
+                            className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:border-brand hover:text-brand"
+                          >
+                            <Download className="h-3.5 w-3.5" />
+                            Export CSV
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => setViewing(group)}
+                          className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:border-brand hover:text-brand"
+                        >
+                          <Eye className="h-3.5 w-3.5" />
+                          View details
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}

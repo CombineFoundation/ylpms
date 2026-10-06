@@ -1,4 +1,6 @@
 import type { ReportAttachment, ReportStatus, ReportType } from "@/types/report.types";
+import type { MemberProfile, UserRole } from "@/types/user.types";
+import { formatDate } from "@/utils/format-date";
 import { timestampToDate, type TimestampInput } from "@/utils/user-status";
 
 export type ApiReport = {
@@ -9,9 +11,14 @@ export type ApiReport = {
   submittedBy: string;
   submittedByName?: string;
   submittedByRegion?: string;
+  submittedByRole?: UserRole;
+  /** GET /api/reports/[reportId] only: the submitter's details and reporting chain. */
+  submitterProfile?: MemberProfile;
   createdAt?: TimestampInput;
   reviewedAt?: TimestampInput;
   reviewComment?: string;
+  /** Set when a returned report was resubmitted: the feedback it was changed after. */
+  previousReviewComment?: string;
   period?: { startDate: TimestampInput; endDate: TimestampInput };
   content?: {
     summary: string;
@@ -52,7 +59,7 @@ export const statusLabels: Record<ReportStatus, string> = {
 
 export const statusStyles: Record<ReportStatus, string> = {
   draft: "bg-gray-100 text-gray-500",
-  submitted: "bg-orange-100 text-orange-500",
+  submitted: "bg-orange-100 text-brand",
   reviewed: "bg-blue-100 text-blue-600",
   approved: "bg-green-100 text-green-600",
   rejected: "bg-red-100 text-red-500",
@@ -83,6 +90,5 @@ export function isReviewable(status: ReportStatus) {
 }
 
 export function formatReportDate(value?: TimestampInput): string {
-  const date = timestampToDate(value);
-  return date ? date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "-";
+  return formatDate(timestampToDate(value));
 }

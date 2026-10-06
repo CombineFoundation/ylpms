@@ -1,4 +1,4 @@
-import { Award, BookOpen, CalendarDays, FileText, LayoutGrid, ListChecks, MessageSquare, UserRound, Users } from "lucide-react";
+import { Award, BookOpen, CalendarDays, FileText, LayoutGrid, ListChecks, MessageSquare, Settings, UserRound, Users } from "lucide-react";
 
 /** SRO portal navigation, shared by the sidebar and the topbar breadcrumb. */
 export const navItems = [
@@ -11,6 +11,7 @@ export const navItems = [
   { label: "Activities", href: "/SRO/activities", icon: CalendarDays },
   { label: "Certificates", href: "/SRO/certificates", icon: Award },
   { label: "Notifications", href: "/SRO/notifications", icon: MessageSquare },
+  { label: "Settings", href: "/SRO/settings", icon: Settings },
 ] as const;
 
 export function pageLabelFor(pathname: string) {

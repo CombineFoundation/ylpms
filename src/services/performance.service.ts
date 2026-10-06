@@ -1,7 +1,7 @@
 import type { UserRole } from "@/types/user.types";
 import type { TaskStatus } from "@/types/task.types";
-import type { EventStatus } from "@/types/event.types";
-import { selectFields, selectFieldsWithIds } from "@/utils/firestore";
+import type { ActivityStatus } from "@/types/activity.types";
+import { selectFields, selectFieldsWithIds, writeCount } from "@/utils/firestore";
 import { toDate } from "@/utils/aggregation";
 import { logger } from "@/utils/errors";
 
@@ -13,7 +13,7 @@ import { logger } from "@/utils/errors";
  * - Task score: completed ÷ assigned tasks across the user's team (the user
  *   plus everyone below them; a volunteer's team is just themselves).
  *   Cancelled tasks don't count.
- * - Activity score: of the approved activities (events) the team organized
+ * - Activity score: of the approved activities (activities) the team organized
  *   that have ended, the share that were verified (completed). Cancelled ones,
  *   and ones still ahead or awaiting approval, don't count. For a volunteer:
  *   activities they took part in ÷ ended activities they signed up for.
@@ -29,7 +29,7 @@ const TASK_WEIGHT = 0.4;
 const TRACKED_ROLES: UserRole[] = ["sro", "ro", "youth-leader", "volunteer"];
 const ASSIGNED_FIELDS = ["assignedROIds", "assignedYouthLeaderIds", "assignedVolunteerIds"] as const;
 /** Approved and past the review step: these count once the activity has ended. */
-const APPROVED_STATUSES: EventStatus[] = ["planned", "ongoing", "evidence-submitted"];
+const APPROVED_STATUSES: ActivityStatus[] = ["planned", "ongoing", "evidence-submitted"];
 
 export interface TaskCounts {
   assigned: number;
@@ -85,8 +85,8 @@ type UserRow = {
 
 type TaskRow = { assignedTo?: string; status?: TaskStatus; dueDate?: unknown };
 
-type EventRow = {
-  status?: EventStatus;
+type ActivityRow = {
+  status?: ActivityStatus;
   endDate?: unknown;
   organizerIds?: string[];
   attendees?: string[];
@@ -133,7 +133,7 @@ function countTasks(tasks: TaskRow[], now: Date): Map<string, TaskCounts> {
  * Per-user activity counts: `organized` for organizers, `attended` for
  * volunteers (signed up, or credited as a participant by the organizer).
  */
-function countActivities(events: EventRow[], now: Date) {
+function countActivities(activities: ActivityRow[], now: Date) {
   const organized = new Map<string, ActivityCounts>();
   const attended = new Map<string, ActivityCounts>();
   const bump = (map: Map<string, ActivityCounts>, userId: string, completed: boolean) => {
@@ -143,15 +143,15 @@ function countActivities(events: EventRow[], now: Date) {
     map.set(userId, counts);
   };
 
-  events.forEach((event) => {
-    const isCompleted = event.status === "completed";
-    const hasEnded = (toDate(event.endDate) ?? now) < now;
+  activities.forEach((activity) => {
+    const isCompleted = activity.status === "completed";
+    const hasEnded = (toDate(activity.endDate) ?? now) < now;
     // Still ahead, awaiting approval, rejected or cancelled: nothing to score yet.
-    if (!isCompleted && !(event.status && APPROVED_STATUSES.includes(event.status) && hasEnded)) return;
+    if (!isCompleted && !(activity.status && APPROVED_STATUSES.includes(activity.status) && hasEnded)) return;
 
-    (event.organizerIds ?? []).forEach((id) => bump(organized, id, isCompleted));
-    const participants = new Set(isCompleted ? event.evidence?.participantIds ?? [] : []);
-    new Set([...(event.attendees ?? []), ...participants]).forEach((id) => bump(attended, id, participants.has(id)));
+    (activity.organizerIds ?? []).forEach((id) => bump(organized, id, isCompleted));
+    const participants = new Set(isCompleted ? activity.evidence?.participantIds ?? [] : []);
+    new Set([...(activity.attendees ?? []), ...participants]).forEach((id) => bump(attended, id, participants.has(id)));
   });
 
   return { organized, attended };
@@ -168,19 +168,43 @@ function scoreFor(node: PerformanceNode): number | null {
   return Math.round((ACTIVITY_WEIGHT * activityScore + TASK_WEIGHT * taskScore) * 100);
 }
 
-export async function getPerformanceTree(): Promise<PerformanceTree> {
+/**
+ * The tree reads every user, task and activity, and nearly every team view
+ * needs it (often more than once per request), so it's shared for a short
+ * while. It's rebuilt sooner when this instance writes to any of its source
+ * collections; writes from other instances show up within CACHE_MS.
+ */
+const CACHE_MS = 30 * 1000;
+const SOURCE_COLLECTIONS = ["users", "tasks", "events"];
+let cached: { tree: Promise<PerformanceTree>; at: number; version: string } | null = null;
+
+const sourceVersion = () => SOURCE_COLLECTIONS.map(writeCount).join(":");
+
+export function getPerformanceTree(): Promise<PerformanceTree> {
+  const version = sourceVersion();
+  if (cached && cached.version === version && Date.now() - cached.at < CACHE_MS) return cached.tree;
+  const tree = buildPerformanceTree();
+  cached = { tree, at: Date.now(), version };
+  // A failed build mustn't be served to later callers.
+  tree.catch(() => {
+    if (cached?.tree === tree) cached = null;
+  });
+  return tree;
+}
+
+async function buildPerformanceTree(): Promise<PerformanceTree> {
   try {
     const userFields = ["name", "email", "role", "region", "reportingToId", ...ASSIGNED_FIELDS];
-    const [users, tasks, events] = await Promise.all([
+    const [users, tasks, activities] = await Promise.all([
       selectFieldsWithIds<UserRow>("users", [{ field: "role", operator: "in", value: TRACKED_ROLES }], userFields),
       selectFields<TaskRow>("tasks", [], ["assignedTo", "status", "dueDate"]),
-      selectFields<EventRow>("events", [], ["status", "endDate", "organizerIds", "attendees", "evidence.participantIds"]),
+      selectFields<ActivityRow>("events", [], ["status", "endDate", "organizerIds", "attendees", "evidence.participantIds"]),
     ]);
 
     const now = new Date();
     const byId = new Map(users.map((user) => [user.id, user]));
     const taskCounts = countTasks(tasks, now);
-    const { organized, attended } = countActivities(events, now);
+    const { organized, attended } = countActivities(activities, now);
 
     // Parent = reportingToId; fall back to a manager that lists the user in an
     // assigned-* array, in case only one side of the assignment was written.

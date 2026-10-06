@@ -17,7 +17,7 @@ export function ActivityPipeline({ activities }: { activities: YouthLeaderDashbo
     <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-semibold text-slate-700">My Activities</h2>
-        <Link href="/youth-leader/activities" className="flex items-center gap-0.5 text-xs font-medium text-orange-500">
+        <Link href="/youth-leader/activities" className="flex items-center gap-0.5 text-xs font-medium text-brand">
           Manage <ChevronRight size={13} />
         </Link>
       </div>

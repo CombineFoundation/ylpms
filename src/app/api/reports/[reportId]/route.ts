@@ -6,10 +6,14 @@ import {
   updateReportStatus,
   deleteReport,
   enrichReportsForList,
+  resubmitReport,
 } from "@/services/report.service";
+import { requireOwnAttachments } from "@/services/report-attachment.service";
+import { getMemberProfiles } from "@/services/team.service";
 import { isInManagerChain } from "@/utils/authorization";
+import { resolveActingAs } from "@/utils/sro-scope";
 import { AuthenticationError, AuthorizationError, NotFoundError } from "@/utils/errors";
-import { updateReportStatusSchema } from "@/utils/validation";
+import { createReportSchema, updateReportStatusSchema } from "@/utils/validation";
 import { apiError, apiSuccess } from "@/utils/api-response";
 
 type Params = { params: Promise<{ reportId: string }> };
@@ -30,8 +34,11 @@ export async function GET(req: NextRequest, { params }: Params) {
         throw new AuthorizationError();
       }
 
-      const [enriched] = await enrichReportsForList([report]);
-      return apiSuccess(enriched);
+      const [[enriched], profiles] = await Promise.all([
+        enrichReportsForList([report]),
+        getMemberProfiles([report.submittedBy]),
+      ]);
+      return apiSuccess({ ...enriched, submitterProfile: profiles.get(report.submittedBy) });
     } catch (error) {
       return apiError(error);
     }
@@ -63,6 +70,40 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
       const report = await updateReportStatus(reportId, status, authReq.user.userId, reviewComment);
 
+      return apiSuccess(report);
+    } catch (error) {
+      return apiError(error);
+    }
+  })(req);
+}
+
+/**
+ * PUT /api/reports/[reportId] - The submitter edits a returned (rejected) report and
+ * sends it back for review. Body: the same as POST /api/reports.
+ * A developer in a portal (?sroId= / ?roId= / ?youthLeaderId=) resubmits as that person.
+ */
+export async function PUT(req: NextRequest, { params }: Params) {
+  const { reportId } = await params;
+  return withAuth(async (authReq) => {
+    try {
+      if (!authReq.user) throw new AuthenticationError();
+
+      const validatedData = createReportSchema.parse(await req.json());
+      const submitterId = (await resolveActingAs(authReq.user, authReq)).userId;
+      await requireOwnAttachments(validatedData.content.attachments ?? [], submitterId);
+
+      const report = await resubmitReport(
+        reportId,
+        {
+          ...validatedData,
+          period: {
+            startDate: new Date(validatedData.period.startDate),
+            endDate: new Date(validatedData.period.endDate),
+          },
+        },
+        submitterId,
+        authReq.user.userId
+      );
       return apiSuccess(report);
     } catch (error) {
       return apiError(error);

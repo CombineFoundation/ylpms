@@ -9,7 +9,7 @@ type YouthLeaderTableProps = {
   emptyMessage: string;
 };
 
-const AVATAR_COLORS = ["bg-pink-500", "bg-blue-500", "bg-purple-500", "bg-emerald-500", "bg-orange-500"];
+const AVATAR_COLORS = ["bg-pink-500", "bg-blue-500", "bg-purple-500", "bg-emerald-500", "bg-brand"];
 const avatarColor = (id: string) => AVATAR_COLORS[[...id].reduce((sum, c) => sum + c.charCodeAt(0), 0) % AVATAR_COLORS.length];
 
 export function YouthLeaderTable({ leaders, isLoading, error, emptyMessage }: YouthLeaderTableProps) {

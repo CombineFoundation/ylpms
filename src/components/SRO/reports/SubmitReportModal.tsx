@@ -3,11 +3,13 @@
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { Modal } from "@/components/ui/Modal";
-import { PdfAttachmentPicker } from "@/components/shared/PdfAttachmentPicker";
+import { AttachedPdfList, PdfAttachmentPicker, ReviewerFeedback } from "@/components/shared/PdfAttachmentPicker";
 import { zodResolver } from "@/lib/zod-resolver";
 import { FieldError, inputClass } from "@/components/Head-of-RO/shared/ListParts";
-import { reportTypeLabels } from "@/components/Head-of-RO/reports/report-display.types";
-import { submitReportSchema, type SubmitReportForm } from "./submit-report.types";
+import { reportTypeLabels, type ApiReport } from "@/components/Head-of-RO/reports/report-display.types";
+import { MAX_REPORT_ATTACHMENTS } from "@/lib/report-attachments";
+import { submitReportSchema, toReportForm, type SubmitReportForm } from "./submit-report.types";
+import type { ReportAttachment } from "@/types/report.types";
 
 type SubmitReportModalProps = {
   isOpen: boolean;
@@ -15,9 +17,12 @@ type SubmitReportModalProps = {
   /** e.g. "Uploading 1 of 2 PDFs..." while the parent uploads before submitting. */
   progress?: string | null;
   onClose: () => void;
-  onSubmit: (values: SubmitReportForm, files: File[]) => Promise<void>;
+  /** `kept`: the PDFs already on a returned report that stay attached. */
+  onSubmit: (values: SubmitReportForm, files: File[], kept: ReportAttachment[]) => Promise<void>;
   /** Who receives and reviews the report. */
   reviewer?: string;
+  /** A returned report being edited and resubmitted; prefills the form. */
+  editing?: ApiReport | null;
 };
 
 const EMPTY_FORM: SubmitReportForm = {
@@ -32,7 +37,15 @@ const EMPTY_FORM: SubmitReportForm = {
 };
 
 /** A manager submits a report to their reviewer (SRO → Head RO, RO → SRO). */
-export function SubmitReportModal({ isOpen, error, progress, onClose, onSubmit, reviewer = "Head RO" }: SubmitReportModalProps) {
+export function SubmitReportModal({
+  isOpen,
+  error,
+  progress,
+  onClose,
+  onSubmit,
+  reviewer = "Head RO",
+  editing = null,
+}: SubmitReportModalProps) {
   const {
     register,
     handleSubmit,
@@ -40,23 +53,30 @@ export function SubmitReportModal({ isOpen, error, progress, onClose, onSubmit, 
     formState: { errors, isSubmitting },
   } = useForm<SubmitReportForm>({ resolver: zodResolver(submitReportSchema), defaultValues: EMPTY_FORM });
   const [files, setFiles] = useState<File[]>([]);
+  const [kept, setKept] = useState<ReportAttachment[]>([]);
 
   useEffect(() => {
     if (!isOpen) return;
-    reset(EMPTY_FORM);
+    reset(editing ? toReportForm(editing) : EMPTY_FORM);
     setFiles([]);
-  }, [isOpen, reset]);
+    setKept(editing?.content?.attachments ?? []);
+  }, [isOpen, editing, reset]);
 
   return (
     <Modal
       isOpen={isOpen}
-      title={`Submit Report to ${reviewer}`}
-      description={`The ${reviewer} will review it and can approve or send it back with feedback.`}
+      title={editing ? "Edit & resubmit report" : `Submit Report to ${reviewer}`}
+      description={
+        editing
+          ? `Make the changes the ${reviewer} asked for, then send it back for review.`
+          : `The ${reviewer} will review it and can approve or send it back with feedback.`
+      }
       onClose={onClose}
       isBusy={isSubmitting}
       size="lg"
     >
-      <form onSubmit={handleSubmit((values) => onSubmit(values, files))} className="space-y-4" noValidate>
+      <form onSubmit={handleSubmit((values) => onSubmit(values, files, kept))} className="space-y-4" noValidate>
+        <ReviewerFeedback title={`${reviewer} feedback`} message={editing?.reviewComment} />
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_180px]">
           <label className="block text-sm font-medium text-gray-700">
             Title
@@ -107,14 +127,21 @@ export function SubmitReportModal({ isOpen, error, progress, onClose, onSubmit, 
           Metrics <span className="font-normal text-gray-400">(optional, one &quot;Label: number&quot; per line)</span>
           <textarea
             rows={3}
-            placeholder={"Volunteers trained: 25\nEvents held: 4"}
+            placeholder={"Volunteers trained: 25\nActivities held: 4"}
             {...register("metrics")}
             className={inputClass}
             aria-invalid={!!errors.metrics}
           />
           <FieldError message={errors.metrics?.message} />
         </label>
-        <PdfAttachmentPicker files={files} onChange={setFiles} disabled={isSubmitting} />
+        <AttachedPdfList attachments={kept} onChange={setKept} disabled={isSubmitting} />
+        <PdfAttachmentPicker
+          files={files}
+          onChange={setFiles}
+          disabled={isSubmitting}
+          label={kept.length ? "Add PDFs" : undefined}
+          maxFiles={MAX_REPORT_ATTACHMENTS - kept.length}
+        />
         {progress && isSubmitting && <p className="text-sm text-gray-500">{progress}</p>}
         {error && (
           <p role="alert" className="text-sm text-red-500">
@@ -135,7 +162,7 @@ export function SubmitReportModal({ isOpen, error, progress, onClose, onSubmit, 
             disabled={isSubmitting}
             className="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {isSubmitting ? "Submitting..." : `Submit to ${reviewer}`}
+            {isSubmitting ? "Submitting..." : editing ? `Resubmit to ${reviewer}` : `Submit to ${reviewer}`}
           </button>
         </div>
       </form>

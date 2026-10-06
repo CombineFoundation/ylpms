@@ -61,7 +61,7 @@ export function YouthLeaderTable({ leaders, isLoading, error, emptyMessage }: Yo
                     </div>
                   </div>
                 </td>
-                <td className={`px-4 py-4 font-medium ${leader.roId ? "text-orange-600" : "text-gray-400"}`}>{leader.roName}</td>
+                <td className={`px-4 py-4 font-medium ${leader.roId ? "text-brand-dark" : "text-gray-400"}`}>{leader.roName}</td>
                 <td className="px-4 py-4 text-gray-600">{leader.region || "Unassigned"}</td>
                 <td className="px-4 py-4 text-gray-600">{leader.volunteers}</td>
                 <td className="px-4 py-4 text-gray-600">

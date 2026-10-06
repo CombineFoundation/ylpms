@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Sidebar from "@/components/volunteer/Sidebar";
 import Topbar from "@/components/volunteer/Topbar";
 import { PortalScopePicker } from "@/components/shared/PortalScopePicker";
+import { CohortAccessBanner } from "@/components/shared/CohortAccessBanner";
 
 export const metadata: Metadata = {
   title: { template: "%s | Volunteer Portal", default: "Volunteer Portal" },
@@ -15,6 +16,7 @@ export default function VolunteerLayout({ children }: { children: React.ReactNod
       <div className="flex min-w-0 flex-1 flex-col">
         <Topbar />
         <PortalScopePicker role="volunteer" className="border-b px-6 py-2.5 lg:px-8" />
+        <CohortAccessBanner certificatesHref="/volunteer/certificates" />
         <main className="flex flex-1 flex-col p-6 lg:p-8">{children}</main>
       </div>
     </div>

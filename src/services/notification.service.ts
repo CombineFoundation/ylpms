@@ -143,7 +143,7 @@ export async function createNotification(
 
 /**
  * Fan out the same notification to several recipients at once. Used for
- * events that many users care about (e.g. a new event being scheduled).
+ * activities that many users care about (e.g. a new activity being scheduled).
  * Best-effort — callers should not let a notification failure break the
  * mutation that triggered it.
  */

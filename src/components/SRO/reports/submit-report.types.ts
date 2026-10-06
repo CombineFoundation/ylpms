@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { endOfLocalDayIso } from "@/components/Head-of-RO/tasks/task-display.types";
+import { endOfLocalDayIso, toDateInputValue } from "@/components/Head-of-RO/tasks/task-display.types";
+import type { ApiReport } from "@/components/Head-of-RO/reports/report-display.types";
 
 /** One entry per line; blank lines ignored. */
 export const toLines = (value: string) =>
@@ -42,6 +43,22 @@ export const submitReportSchema = z
   });
 
 export type SubmitReportForm = z.infer<typeof submitReportSchema>;
+
+/** A returned report → form values, to edit and resubmit it. */
+export function toReportForm(report: ApiReport): SubmitReportForm {
+  return {
+    title: report.title,
+    type: report.type,
+    startDate: toDateInputValue(report.period?.startDate),
+    endDate: toDateInputValue(report.period?.endDate),
+    summary: report.content?.summary ?? "",
+    achievements: (report.content?.achievements ?? []).join("\n"),
+    challenges: (report.content?.challenges ?? []).join("\n"),
+    metrics: Object.entries(report.content?.metrics ?? {})
+      .map(([label, value]) => `${label}: ${value}`)
+      .join("\n"),
+  };
+}
 
 /** Form values → POST /api/reports body. */
 export function toReportPayload(values: SubmitReportForm) {

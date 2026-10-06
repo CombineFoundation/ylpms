@@ -18,6 +18,7 @@ import {
   Upload,
   Users,
 } from "lucide-react";
+import { nameWithRole } from "@/components/shared/MemberProfileCard";
 import { WorkflowSteps } from "./WorkflowSteps";
 import {
   formatActivityRange,
@@ -34,6 +35,7 @@ export type ActivityAction =
   | "edit"
   | "delete"
   | "submit"
+  | "withdraw"
   | "approve"
   | "reject"
   | "start"
@@ -123,7 +125,7 @@ export function ActivityCard({ activity, isBusy, onAction }: ActivityCardProps) 
           {activity.attendeeCount}
           {activity.maxAttendees ? ` / ${activity.maxAttendees}` : ""}
         </span>
-        <span>{activity.isOrganizer ? "Organized by you" : `By ${activity.organizerName}`}</span>
+        <span>{activity.isOrganizer ? "Organized by you" : `By ${nameWithRole(activity.organizerName, activity.organizerRole)}`}</span>
         {activity.isAttending && (
           <span className="flex items-center gap-1 font-medium text-emerald-600">
             <CheckCircle2 size={11} /> You&apos;re signed up
@@ -160,6 +162,11 @@ export function ActivityCard({ activity, isBusy, onAction }: ActivityCardProps) 
         {p.canSubmit && (
           <ActionButton onClick={act("submit")} disabled={isBusy} icon={<Send size={12} />} tone="primary">
             {activity.status === "rejected" ? "Resubmit" : "Submit for approval"}
+          </ActionButton>
+        )}
+        {p.canWithdraw && (
+          <ActionButton onClick={act("withdraw")} disabled={isBusy} icon={<Undo2 size={12} />}>
+            Withdraw to draft
           </ActionButton>
         )}
         {p.canReview && (

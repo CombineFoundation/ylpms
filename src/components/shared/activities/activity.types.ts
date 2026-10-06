@@ -1,22 +1,23 @@
 import { z } from "zod";
-import type { EventMode, EventPermissions, EventStatus, EventType } from "@/types/event.types";
+import type { ActivityMode, ActivityPermissions, ActivityStatus, ActivityType } from "@/types/activity.types";
 import type { ReportAttachment } from "@/types/report.types";
-import type { UserRole } from "@/types/user.types";
+import type { MemberProfile, UserRole } from "@/types/user.types";
 import { timestampToDate, type TimestampInput } from "@/utils/user-status";
+import { formatDate, formatTime, isSamePktDay } from "@/utils/format-date";
 import type { ScopedRole } from "@/utils/portal-scope";
 
 /** Which portal the board is rendered in; Head RO's isn't a scoped (per-person) portal. */
 export type ActivityPortal = ScopedRole | "head-ro";
 
-/** An event as GET /api/events returns it (timestamps serialized). */
+/** An activity as GET /api/activities returns it (timestamps serialized). */
 export type ApiActivity = {
   id: string;
   title: string;
   description: string;
-  type: EventType;
+  type: ActivityType;
   /** Missing on activities created before the format was recorded (counted as onsite). */
-  mode?: EventMode;
-  status: EventStatus;
+  mode?: ActivityMode;
+  status: ActivityStatus;
   startDate: TimestampInput;
   endDate: TimestampInput;
   location: string;
@@ -37,40 +38,41 @@ export type ApiActivity = {
     attachments: ReportAttachment[];
     submittedAt: TimestampInput;
   };
-  permissions: EventPermissions;
+  permissions: ActivityPermissions;
 };
 
 type Person = { id: string; name: string; role: UserRole };
 
-/** GET /api/events/[eventId] adds names for the people who manage the event. */
+/** GET /api/activities/[activityId] adds names for the people who manage the activity. */
 export type ApiActivityDetail = ApiActivity & {
   attendeeList?: Person[];
   participantList?: Person[];
   candidateList?: (Person & { signedUp: boolean })[];
+  organizerProfile?: MemberProfile;
 };
 
-export const typeLabels: Record<EventType, string> = {
+export const typeLabels: Record<ActivityType, string> = {
   workshop: "Workshop",
   training: "Training",
   meeting: "Meeting",
-  "volunteer-event": "Volunteer Event",
+  "volunteer-event": "Volunteer Activity",
   other: "Other",
 };
 
-export const modeLabels: Record<EventMode, string> = {
+export const modeLabels: Record<ActivityMode, string> = {
   onsite: "Onsite",
   online: "Online (webinar)",
 };
 
-export const typeStyles: Record<EventType, string> = {
-  workshop: "bg-orange-100 text-orange-600",
+export const typeStyles: Record<ActivityType, string> = {
+  workshop: "bg-orange-100 text-brand-dark",
   training: "bg-purple-100 text-purple-600",
   meeting: "bg-blue-100 text-blue-600",
   "volunteer-event": "bg-emerald-100 text-emerald-600",
   other: "bg-gray-100 text-gray-500",
 };
 
-export const statusLabels: Record<EventStatus, string> = {
+export const statusLabels: Record<ActivityStatus, string> = {
   draft: "Draft",
   submitted: "Awaiting approval",
   rejected: "Needs changes",
@@ -81,7 +83,7 @@ export const statusLabels: Record<EventStatus, string> = {
   cancelled: "Cancelled",
 };
 
-export const statusStyles: Record<EventStatus, string> = {
+export const statusStyles: Record<ActivityStatus, string> = {
   draft: "bg-gray-100 text-gray-600",
   submitted: "bg-amber-50 text-amber-700",
   rejected: "bg-red-50 text-red-600",
@@ -105,7 +107,7 @@ export const WORKFLOW_STEPS = [
 ] as const;
 
 /** How many workflow steps are done at each status (cancelled shows no progress). */
-const stepsDone: Record<EventStatus, number> = {
+const stepsDone: Record<ActivityStatus, number> = {
   draft: 1,
   submitted: 2,
   rejected: 3,
@@ -116,7 +118,7 @@ const stepsDone: Record<EventStatus, number> = {
   cancelled: 0,
 };
 
-export function completedSteps(status: EventStatus) {
+export function completedSteps(status: ActivityStatus) {
   return stepsDone[status];
 }
 
@@ -126,13 +128,11 @@ export const usesWorkflow = (activity: Pick<ApiActivity, "organizerRole">) => ac
 export function formatActivityRange(start?: TimestampInput, end?: TimestampInput): string {
   const startDate = timestampToDate(start);
   const endDate = timestampToDate(end);
-  if (!startDate) return "-";
-  const day = (date: Date) => date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
-  const time = (date: Date) => date.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
-  if (!endDate) return `${day(startDate)} · ${time(startDate)}`;
-  return startDate.toDateString() === endDate.toDateString()
-    ? `${day(startDate)} · ${time(startDate)}–${time(endDate)}`
-    : `${day(startDate)} – ${day(endDate)}`;
+  if (!startDate) return formatDate(null);
+  if (!endDate) return `${formatDate(startDate)} · ${formatTime(startDate)}`;
+  return isSamePktDay(startDate, endDate)
+    ? `${formatDate(startDate)} · ${formatTime(startDate)}–${formatTime(endDate)}`
+    : `${formatDate(startDate)} – ${formatDate(endDate)}`;
 }
 
 export function toDateTimeInputValue(value?: TimestampInput): string {

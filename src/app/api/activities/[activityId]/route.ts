@@ -1,24 +1,24 @@
 import { NextRequest } from "next/server";
 import { withAuth } from "@/middleware/auth.middleware";
-import { getEventDetail, updateEvent, deleteEvent } from "@/services/event.service";
+import { getActivityDetail, updateActivity, deleteActivity } from "@/services/activity.service";
 import { resolveActingAs } from "@/utils/sro-scope";
 import { AuthenticationError } from "@/utils/errors";
-import { updateEventSchema } from "@/utils/validation";
+import { updateActivitySchema } from "@/utils/validation";
 import { apiError, apiSuccess } from "@/utils/api-response";
 
-type Params = { params: Promise<{ eventId: string }> };
+type Params = { params: Promise<{ activityId: string }> };
 
 /**
- * GET /api/events/[eventId] - One event with the caller's permissions; organizers
+ * GET /api/activities/[activityId] - One activity with the caller's permissions; organizers
  * and reviewers also get attendee / participant names.
  */
 export async function GET(req: NextRequest, { params }: Params) {
-  const { eventId } = await params;
+  const { activityId } = await params;
   return withAuth(async (authReq) => {
     try {
       if (!authReq.user) throw new AuthenticationError();
 
-      return apiSuccess(await getEventDetail(eventId, await resolveActingAs(authReq.user, authReq)));
+      return apiSuccess(await getActivityDetail(activityId, await resolveActingAs(authReq.user, authReq)));
     } catch (error) {
       return apiError(error);
     }
@@ -26,19 +26,19 @@ export async function GET(req: NextRequest, { params }: Params) {
 }
 
 /**
- * PATCH /api/events/[eventId] - Edit an event's details (while it's a draft, rejected, or planned).
- * Status changes go through POST /api/events/[eventId]/workflow.
+ * PATCH /api/activities/[activityId] - Edit an activity's details (while it's a draft, rejected, or planned).
+ * Status changes go through POST /api/activities/[activityId]/workflow.
  */
 export async function PATCH(req: NextRequest, { params }: Params) {
-  const { eventId } = await params;
+  const { activityId } = await params;
   return withAuth(async (authReq) => {
     try {
       if (!authReq.user) throw new AuthenticationError();
 
-      const validatedData = updateEventSchema.parse(await req.json());
+      const validatedData = updateActivitySchema.parse(await req.json());
 
-      const updated = await updateEvent(
-        eventId,
+      const updated = await updateActivity(
+        activityId,
         {
           ...validatedData,
           startDate: validatedData.startDate ? new Date(validatedData.startDate) : undefined,
@@ -55,17 +55,17 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 }
 
 /**
- * DELETE /api/events/[eventId] - Delete a draft, rejected or cancelled event (Head RO: any event).
+ * DELETE /api/activities/[activityId] - Delete a draft, rejected or cancelled activity (Head RO: any activity).
  */
 export async function DELETE(req: NextRequest, { params }: Params) {
-  const { eventId } = await params;
+  const { activityId } = await params;
   return withAuth(async (authReq) => {
     try {
       if (!authReq.user) throw new AuthenticationError();
 
-      await deleteEvent(eventId, await resolveActingAs(authReq.user, authReq));
+      await deleteActivity(activityId, await resolveActingAs(authReq.user, authReq));
 
-      return apiSuccess({ message: "Event deleted successfully" });
+      return apiSuccess({ message: "Activity deleted successfully" });
     } catch (error) {
       return apiError(error);
     }

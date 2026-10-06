@@ -91,6 +91,11 @@ export function TaskTable({
                     </span>
                   </td>
                   <td className="px-6 py-4">
+                    {t.isMonthly ? (
+                      <span className={`inline-block whitespace-nowrap rounded-full px-3 py-1 text-xs font-semibold ${statusStyles[t.status]}`}>
+                        {statusLabels[t.status]}
+                      </span>
+                    ) : (
                     <select
                       aria-label={`Status of "${t.title}"`}
                       value={t.status}
@@ -105,8 +110,25 @@ export function TaskTable({
                         </option>
                       ))}
                     </select>
+                    )}
                   </td>
                   <td className="px-6 py-4">
+                    {t.isMonthly ? (
+                      <div className="flex items-center gap-3">
+                        {t.submission && (
+                          <button
+                            type="button"
+                            onClick={() => onViewSubmission(t)}
+                            className="flex items-center gap-1 whitespace-nowrap text-xs font-medium text-gray-500 hover:text-brand"
+                          >
+                            <FileCheck className="h-3.5 w-3.5" /> View
+                          </button>
+                        )}
+                        <span className="text-xs text-gray-400" title="The youth leader's RO manages and reviews monthly tasks">
+                          Monthly · RO reviews
+                        </span>
+                      </div>
+                    ) : (
                     <div className="flex items-center gap-3">
                       {t.status === "submitted" && <ReviewButton onClick={() => onViewSubmission(t)} />}
                       {t.submission && t.status !== "submitted" && (
@@ -139,6 +161,7 @@ export function TaskTable({
                         <Trash2 className="h-4 w-4" />
                       </button>
                     </div>
+                    )}
                   </td>
                 </tr>
               ))}

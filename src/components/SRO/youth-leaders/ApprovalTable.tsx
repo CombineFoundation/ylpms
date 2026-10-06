@@ -48,13 +48,14 @@ export function ApprovalTable({
               <tr key={request.id} className="align-top hover:bg-gray-50/60">
                 <td className="px-5 py-4">
                   <p className="font-medium text-gray-900">{request.name}</p>
+                  {request.teamRole && <p className="text-xs text-gray-500">{request.teamRole}</p>}
                   <p className="text-xs text-gray-400">
                     {request.memberId ? `ID ${request.memberId} · ` : ""}
                     {request.email}
                     {request.phone ? ` · ${request.phone}` : ""}
                   </p>
                 </td>
-                <td className="px-4 py-4 font-medium text-orange-600">{request.requestedByName}</td>
+                <td className="px-4 py-4 font-medium text-brand-dark">{request.requestedByName}</td>
                 <td className="px-4 py-4 text-gray-600">{request.region || "—"}</td>
                 <td className="whitespace-nowrap px-4 py-4 text-gray-500">{formatRelativeTime(request.createdAt)}</td>
                 <td className="px-4 py-4">

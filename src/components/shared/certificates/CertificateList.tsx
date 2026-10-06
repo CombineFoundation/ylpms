@@ -90,7 +90,7 @@ export function CertificateList({ portal }: { portal: ScopedRole }) {
           {filtered.map((certificate) => (
             <article key={certificate.id} className="flex flex-col rounded-xl border border-gray-100 bg-white p-5 shadow-sm">
               <div className="mb-3 flex items-start justify-between gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-orange-100 text-orange-500">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-orange-100 text-brand">
                   <Award className="h-5 w-5" />
                 </div>
                 <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-[10px] font-semibold text-emerald-700">

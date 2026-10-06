@@ -76,7 +76,7 @@ export function AssignedROTable({ ros, isLoading, error, emptyMessage, onAssignT
                     <button
                       type="button"
                       onClick={() => onAssignTask(ro)}
-                      className="whitespace-nowrap rounded-full bg-orange-500 px-4 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-orange-600"
+                      className="whitespace-nowrap rounded-full bg-brand px-4 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-brand-dark"
                     >
                       Assign Task
                     </button>

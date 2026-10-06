@@ -115,15 +115,15 @@ export const updateVolunteerSchema = z.object({
   zipCode: z.string().optional(),
 });
 
-// Event validation schemas
-const eventTypeSchema = z.enum(["workshop", "training", "meeting", "volunteer-event", "other"]);
-const eventModeSchema = z.enum(["onsite", "online"]);
+// Activity validation schemas
+const activityTypeSchema = z.enum(["workshop", "training", "meeting", "volunteer-event", "other"]);
+const activityModeSchema = z.enum(["onsite", "online"]);
 
-export const createEventSchema = z.object({
+export const createActivitySchema = z.object({
   title: z.string().trim().min(3, "Title must be at least 3 characters"),
   description: z.string().trim().min(10, "Description must be at least 10 characters"),
-  type: eventTypeSchema,
-  mode: eventModeSchema.default("onsite"),
+  type: activityTypeSchema,
+  mode: activityModeSchema.default("onsite"),
   startDate: z
     .string()
     .refine(isValidDate, "Invalid start date")
@@ -136,12 +136,12 @@ export const createEventSchema = z.object({
   { message: "End date must be after start date", path: ["endDate"] }
 );
 
-/** Details only — status changes go through POST /api/events/[eventId]/workflow. */
-export const updateEventSchema = z.object({
+/** Details only — status changes go through POST /api/activities/[activityId]/workflow. */
+export const updateActivitySchema = z.object({
   title: z.string().trim().min(3, "Title must be at least 3 characters").optional(),
   description: z.string().trim().min(10, "Description must be at least 10 characters").optional(),
-  type: eventTypeSchema.optional(),
-  mode: eventModeSchema.optional(),
+  type: activityTypeSchema.optional(),
+  mode: activityModeSchema.optional(),
   startDate: z.string().refine(isValidDate, "Invalid start date").optional(),
   endDate: z.string().refine(isValidDate, "Invalid end date").optional(),
   location: z.string().trim().min(3, "Location must be at least 3 characters").optional(),
@@ -150,6 +150,17 @@ export const updateEventSchema = z.object({
   (data) => !data.startDate || !data.endDate || new Date(data.endDate) > new Date(data.startDate),
   { message: "End date must be after start date", path: ["endDate"] }
 );
+
+// Direct-to-Storage uploads: ask for a signed upload URL, then confirm the upload.
+export const uploadUrlRequestSchema = z.object({
+  name: z.string().trim().min(1, "The file needs a name").max(200),
+  size: z.number().int().positive("The file is empty"),
+});
+
+export const confirmUploadSchema = z.object({
+  uploadPath: z.string().min(1).max(300),
+  name: z.string().trim().min(1).max(200),
+});
 
 /** A PDF already uploaded via POST /api/reports/attachments. */
 const attachmentSchema = z.object({
@@ -160,13 +171,14 @@ const attachmentSchema = z.object({
 
 const workflowComment = z.string().trim().max(1000, "Comment must be 1000 characters or fewer").optional();
 
-/** One step of the activity workflow (see event.service). */
-export const eventWorkflowSchema = z.discriminatedUnion("action", [
+/** One step of the activity workflow (see activity.service). */
+export const activityWorkflowSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("submit") }),
+  z.object({ action: z.literal("withdraw") }),
   z.object({ action: z.literal("approve"), comment: workflowComment }),
   z.object({
     action: z.literal("reject"),
-    comment: z.string().trim().min(3, "Please give a reason for rejecting this event").max(1000),
+    comment: z.string().trim().min(3, "Please give a reason for rejecting this activity").max(1000),
   }),
   z.object({ action: z.literal("start") }),
   z.object({
@@ -185,7 +197,7 @@ export const eventWorkflowSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("cancel"), comment: workflowComment }),
 ]);
 
-export const eventAttendanceSchema = z.object({ action: z.enum(["join", "leave"]) });
+export const activityAttendanceSchema = z.object({ action: z.enum(["join", "leave"]) });
 
 /** The assignee hands in their work (sent to the assigner for review). */
 export const submitTaskSchema = z.object({
@@ -241,6 +253,11 @@ export const createMemberRequestSchema = z.object({
 
 /** An RO's youth leader request carries the new youth leader's ID; a volunteer's ID is set by the approving RO. */
 export const createYouthLeaderRequestSchema = createMemberRequestSchema.extend({ memberId: memberIdSchema });
+
+/** A youth leader's volunteer request also says what the volunteer will do in the team. */
+export const createVolunteerRequestSchema = createMemberRequestSchema.extend({
+  teamRole: z.string().trim().min(2, "Team role must be at least 2 characters").max(60, "Keep the team role under 60 characters"),
+});
 
 export const reviewMemberRequestSchema = z.object({
   decision: z.enum(["approved", "rejected"]),

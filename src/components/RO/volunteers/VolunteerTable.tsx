@@ -10,6 +10,7 @@ export type TeamVolunteer = {
   name: string;
   email?: string;
   memberId?: string;
+  teamRole?: string;
   region?: string;
   managerId: string | null;
   managerName: string;
@@ -62,6 +63,7 @@ export function VolunteerTable({ volunteers, isLoading, error, emptyMessage, sho
                     </div>
                     <div className="min-w-0">
                       <p className="truncate font-medium text-gray-800">{volunteer.name}</p>
+                      {volunteer.teamRole && <p className="truncate text-xs text-gray-500">{volunteer.teamRole}</p>}
                       {(volunteer.memberId || volunteer.email) && (
                         <p className="truncate text-xs text-gray-400">
                           {volunteer.memberId ? `ID ${volunteer.memberId}${volunteer.email ? " · " : ""}` : ""}
@@ -73,7 +75,7 @@ export function VolunteerTable({ volunteers, isLoading, error, emptyMessage, sho
                 </td>
                 {showManager && (
                   <td className="px-4 py-4">
-                    <span className={`font-medium ${volunteer.managerId ? "text-orange-600" : "text-gray-400"}`}>
+                    <span className={`font-medium ${volunteer.managerId ? "text-brand-dark" : "text-gray-400"}`}>
                       {volunteer.managerName}
                     </span>
                     {volunteer.managerRole === "ro" && <span className="ml-1 text-xs text-gray-400">(you)</span>}
