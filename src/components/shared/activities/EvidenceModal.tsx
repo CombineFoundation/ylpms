@@ -9,7 +9,7 @@ import { roleTitles } from "@/hooks/useCurrentProfile";
 import { Modal } from "@/components/ui/Modal";
 import { FieldError, SearchInput, inputClass } from "@/components/Head-of-RO/shared/ListParts";
 import { AttachedPdfList, PdfAttachmentPicker, ReviewerFeedback } from "@/components/shared/PdfAttachmentPicker";
-import { MAX_REPORT_ATTACHMENTS } from "@/lib/report-attachments";
+import { MAX_ATTACHMENTS } from "@/lib/report-attachments";
 import type { ReportAttachment } from "@/types/report.types";
 import { runWorkflow, withScope, type ActivityScope } from "./activity.api";
 import { evidenceFormSchema, usesWorkflow, type ApiActivity, type ApiActivityDetail, type EvidenceForm } from "./activity.types";
@@ -23,7 +23,7 @@ type EvidenceModalProps = {
 
 /**
  * "Submit Evidence": what happened, who took part (sign-ups plus the
- * organizer's own team), and optional PDFs such as an attendance sheet.
+ * organizer's own team), and optional PDFs or photos such as an attendance sheet.
  */
 export function EvidenceModal({ activity, scope, onClose, onSubmitted }: EvidenceModalProps) {
   const [detail, setDetail] = useState<ApiActivityDetail | null>(null);
@@ -49,7 +49,7 @@ export function EvidenceModal({ activity, scope, onClose, onSubmitted }: Evidenc
     setDetail(null);
     setLoadError(null);
     setFiles([]);
-    // Evidence that was returned keeps its PDFs unless they're removed.
+    // Evidence that was returned keeps its files unless they're removed.
     setKept(activity.evidence?.attachments ?? []);
     setSearch("");
     setSubmitError(null);
@@ -89,7 +89,7 @@ export function EvidenceModal({ activity, scope, onClose, onSubmitted }: Evidenc
       const actingAs = scope.portal !== "head-ro" && scope.selectedId ? { role: scope.portal, id: scope.selectedId } : null;
       const attachments = [...kept];
       for (const [index, file] of files.entries()) {
-        setProgress(`Uploading PDF ${index + 1} of ${files.length}...`);
+        setProgress(`Uploading file ${index + 1} of ${files.length}...`);
         attachments.push(await uploadReportPdf(file, actingAs));
       }
       setProgress("Submitting evidence...");
@@ -194,8 +194,8 @@ export function EvidenceModal({ activity, scope, onClose, onSubmitted }: Evidenc
           files={files}
           onChange={setFiles}
           disabled={isSubmitting}
-          label={kept.length ? "Add more evidence PDFs" : "Evidence PDFs"}
-          maxFiles={MAX_REPORT_ATTACHMENTS - kept.length}
+          label={kept.length ? "Add more evidence (PDF or photo)" : "Evidence (PDFs or photos)"}
+          maxFiles={MAX_ATTACHMENTS - kept.length}
         />
 
         {progress && isSubmitting && <p className="text-sm text-gray-500">{progress}</p>}

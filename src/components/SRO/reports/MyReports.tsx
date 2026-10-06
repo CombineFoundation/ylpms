@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Eye, Paperclip, RotateCcw } from "lucide-react";
 import { TableMessageRow } from "@/components/Head-of-RO/shared/ListParts";
 import { ReportDetailModal } from "@/components/Head-of-RO/reports/ReportDetailModal";
@@ -18,7 +18,7 @@ const myStatusLabels = (reviewer: string): Record<ReportStatus, string> => ({
   submitted: `Awaiting ${reviewer}`,
   reviewed: "Under review",
   approved: "Approved",
-  rejected: "Returned",
+  rejected: "Changes requested",
 });
 
 type MyReportsProps = {
@@ -29,12 +29,18 @@ type MyReportsProps = {
   reviewer?: string;
   /** Opens a returned report to edit and resubmit it. */
   onResubmit?: (report: ApiReport) => void;
+  /** A report to open straight away (from a notification's link). */
+  openReportId?: string | null;
 };
 
 /** Reports the manager submitted to their reviewer, with review status and feedback. */
-export function MyReports({ reports, isLoading, error, reviewer = "Head RO", onResubmit }: MyReportsProps) {
+export function MyReports({ reports, isLoading, error, reviewer = "Head RO", onResubmit, openReportId = null }: MyReportsProps) {
   const labels = myStatusLabels(reviewer);
   const [viewingId, setViewingId] = useState<string | null>(null);
+  // Opened from a notification's link (the detail view loads the report itself).
+  useEffect(() => {
+    if (openReportId) setViewingId(openReportId);
+  }, [openReportId]);
 
   return (
     <>
@@ -69,7 +75,7 @@ export function MyReports({ reports, isLoading, error, reviewer = "Head RO", onR
                       {!!report.content?.attachments?.length && (
                         <span
                           className="flex items-center gap-0.5 font-normal text-gray-400"
-                          title={`${report.content.attachments.length} PDF attachment(s)`}
+                          title={`${report.content.attachments.length} attachment(s)`}
                         >
                           <Paperclip size={12} />
                           {report.content.attachments.length}

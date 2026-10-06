@@ -7,7 +7,7 @@ import { notifyUsers } from "./notification.service";
 import { chunk, getTeam } from "./team.service";
 import { getCurrentCohort } from "./cohort.service";
 import { FIRST_SYSTEM_COHORT, cohortId } from "@/config/cohorts";
-import type { Certificate, CertificateKind } from "@/types/certificate.types";
+import type { Certificate, CertificateKind, CertificateVerification } from "@/types/certificate.types";
 import type { Activity } from "@/types/activity.types";
 import type { User, UserRole } from "@/types/user.types";
 
@@ -167,6 +167,30 @@ export async function issueActivityCertificates(activity: Activity, issuedById: 
 
 
   return newCertificates.length;
+}
+
+/**
+ * Public check of a certificate number (the /verify page): only what's printed
+ * on the certificate itself, or null when no certificate has that number.
+ */
+export async function verifyCertificate(number: string): Promise<CertificateVerification | null> {
+  const certificateNumber = number.trim().toUpperCase();
+  if (!certificateNumber) return null;
+  const [certificate] = await queryDocs<Certificate>(COLLECTION, [
+    { field: "certificateNumber", operator: "==", value: certificateNumber },
+  ]);
+  if (!certificate) return null;
+  return {
+    certificateNumber: certificate.certificateNumber,
+    recipientName: certificate.recipientName,
+    title: certificate.title,
+    kind: certificate.kind,
+    eventTitle: certificate.eventTitle,
+    eventLocation: certificate.eventLocation,
+    eventDate: toDate(certificate.eventDate)?.toISOString() ?? null,
+    issuedAt: toDate(certificate.issuedAt)?.toISOString() ?? null,
+    status: certificate.status,
+  };
 }
 
 /** A user's certificates, newest first. */

@@ -73,9 +73,10 @@ export function usePagedList<T>(
 const SEARCH_ROW_LIMIT = 2000;
 
 /**
- * Lists search on the client, so a search would only see the pages loaded so
- * far. While `query` is non-empty this keeps loading pages (up to
- * SEARCH_ROW_LIMIT rows) so the search covers the whole list.
+ * Lists search and filter on the client, so either would only see the pages
+ * loaded so far. While `query` is non-empty, or `isFiltering` is set (a status
+ * or city filter is chosen, or the list should always be complete), this keeps
+ * loading pages (up to SEARCH_ROW_LIMIT rows) so it covers the whole list.
  */
 export function useLoadAllWhileSearching(
   list: {
@@ -86,10 +87,11 @@ export function useLoadAllWhileSearching(
     error: string | null;
     loadMore: () => void;
   },
-  query: string
+  query: string,
+  isFiltering = false
 ) {
   const { hasMore, isLoading, isLoadingMore, error, items, loadMore } = list;
-  const isSearching = query.trim().length > 0;
+  const isSearching = query.trim().length > 0 || isFiltering;
   const loadMoreRef = useRef(loadMore);
   loadMoreRef.current = loadMore;
 

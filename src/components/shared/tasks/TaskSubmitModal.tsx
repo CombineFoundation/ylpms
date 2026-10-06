@@ -11,7 +11,7 @@ import type { ScopedRole } from "@/utils/portal-scope";
 import { Modal } from "@/components/ui/Modal";
 import { FieldError, inputClass } from "@/components/Head-of-RO/shared/ListParts";
 import { AttachedPdfList, PdfAttachmentPicker, ReviewerFeedback } from "@/components/shared/PdfAttachmentPicker";
-import { MAX_REPORT_ATTACHMENTS } from "@/lib/report-attachments";
+import { MAX_ATTACHMENTS } from "@/lib/report-attachments";
 import type { ReportAttachment } from "@/types/report.types";
 import type { TaskStatus } from "@/types/task.types";
 
@@ -36,7 +36,7 @@ type TaskSubmitModalProps = {
   onSubmitted: (taskId: string, status: TaskStatus) => void;
 };
 
-/** The assignee hands in their work (a note and optional PDFs) for the assigner to review. */
+/** The assignee hands in their work (a note and optional PDFs or photos) for the assigner to review. */
 export function TaskSubmitModal({ task, portal, selectedId, onClose, onSubmitted }: TaskSubmitModalProps) {
   const [files, setFiles] = useState<File[]>([]);
   const [kept, setKept] = useState<ReportAttachment[]>([]);
@@ -65,7 +65,7 @@ export function TaskSubmitModal({ task, portal, selectedId, onClose, onSubmitted
       const actingAs = selectedId ? { role: portal, id: selectedId } : null;
       const attachments = [...kept];
       for (const [index, file] of files.entries()) {
-        setProgress(`Uploading PDF ${index + 1} of ${files.length}...`);
+        setProgress(`Uploading file ${index + 1} of ${files.length}...`);
         attachments.push(await uploadReportPdf(file, actingAs));
       }
       setProgress("Submitting...");
@@ -114,8 +114,8 @@ export function TaskSubmitModal({ task, portal, selectedId, onClose, onSubmitted
           files={files}
           onChange={setFiles}
           disabled={isSubmitting}
-          label={kept.length ? "Add more proof (PDF)" : "Proof of work (PDF)"}
-          maxFiles={MAX_REPORT_ATTACHMENTS - kept.length}
+          label={kept.length ? "Add more proof (PDF or photo)" : "Proof of work (PDF or photo)"}
+          maxFiles={MAX_ATTACHMENTS - kept.length}
         />
         {progress && isSubmitting && <p className="text-sm text-gray-500">{progress}</p>}
         {error && (

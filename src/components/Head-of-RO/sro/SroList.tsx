@@ -9,8 +9,9 @@ import { SroTable } from "./SroTable";
 import type { Sro, SroForm } from "./sro.types";
 import { PageHeader, emptyMessage } from "../shared/ListParts";
 import { UserToolbar } from "../shared/UserToolbar";
+import { exportMembersCsv } from "../shared/exportMembers";
 import { useUserAdminActions } from "../shared/useUserAdminActions";
-import { matchesQuery, regionOptions, toUserRow, type ApiUser, type StatusFilter } from "../shared/users";
+import { matchesFilters, regionOptions, toUserRow, type ApiUser, type StatusFilter } from "../shared/users";
 
 export function SroList() {
   const list = usePagedList<ApiUser>(
@@ -21,8 +22,8 @@ export function SroList() {
   const sros = useMemo(() => list.items.map(toUserRow), [list.items]);
 
   const [query, setQuery] = useState("");
-  // Search runs on the client, so fetch the remaining pages while searching.
-  useLoadAllWhileSearching(list, query);
+  // A short list, so it's always loaded in full and the status/region filters see everyone.
+  useLoadAllWhileSearching(list, query, true);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("All");
   const [regionFilter, setRegionFilter] = useState("");
 
@@ -34,15 +35,19 @@ export function SroList() {
   const admin = useUserAdminActions("SRO", list.reload);
 
   const filteredSros = useMemo(
-    () =>
-      sros.filter(
-        (sro) =>
-          matchesQuery(sro, query) &&
-          (statusFilter === "All" || sro.status === statusFilter) &&
-          (!regionFilter || sro.regionLabel === regionFilter)
-      ),
+    () => sros.filter((row) => matchesFilters(row, { query, statusFilter, regionFilter })),
     [sros, query, statusFilter, regionFilter]
   );
+
+  const exportCsv = () =>
+    exportMembersCsv({
+      path: `/api/users?role=sro`,
+      keep: (row) => matchesFilters(row, { query, statusFilter, regionFilter }),
+      fileStem: "sros",
+      regionLabel: "Region",
+      managerLabel: "Head RO",
+      teamLabel: "ROs",
+    });
 
   const openAddModal = () => {
     setEditingSro(null);
@@ -90,6 +95,7 @@ export function SroList() {
     <div className="space-y-6">
       <PageHeader title="Senior Reporting Officers" description="Manage and assign SROs across all regions." />
       <UserToolbar
+        onExport={exportCsv}
         query={query}
         onQueryChange={setQuery}
         searchPlaceholder="Search SROs by name, email or region..."
@@ -111,6 +117,7 @@ export function SroList() {
         onEdit={openEditModal}
         onDelete={admin.requestDelete}
         onStatusChange={admin.requestStatusChange}
+        onSendReset={admin.requestPasswordReset}
         onManageROs={setManageSro}
       />
       <SroFormModal

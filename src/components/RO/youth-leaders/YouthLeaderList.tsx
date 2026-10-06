@@ -93,7 +93,7 @@ export function YouthLeaderList() {
         title="Youth Leaders"
         description={
           pendingCount > 0
-            ? `Manage youth leaders in your region · ${pendingCount} awaiting RO approval.`
+            ? `Manage youth leaders in your region · ${pendingCount} awaiting SRO approval.`
             : "Manage youth leaders in your region."
         }
         actions={

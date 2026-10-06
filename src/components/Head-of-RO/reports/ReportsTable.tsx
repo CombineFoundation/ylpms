@@ -17,7 +17,6 @@ type ReportsTableProps = {
   onApprove: (report: DisplayReport) => void;
   onReject: (report: DisplayReport) => void;
   /** False for a view-only list (no approve/reject buttons). */
-  canReview?: boolean;
 };
 
 export function ReportsTable({
@@ -32,7 +31,6 @@ export function ReportsTable({
   onView,
   onApprove,
   onReject,
-  canReview = true,
 }: ReportsTableProps) {
   return (
     <>
@@ -81,7 +79,7 @@ export function ReportsTable({
                       >
                         <Eye size={15} />
                       </button>
-                      {canReview && isReviewable(report.status) && (
+                      {report.canReview && isReviewable(report.status) && (
                         <>
                           <button
                             type="button"
@@ -97,7 +95,7 @@ export function ReportsTable({
                             disabled={reviewingId === report.id}
                             className="rounded-md border border-red-200 px-3 py-1 text-[11px] font-semibold text-red-500 transition-colors hover:bg-red-50 disabled:opacity-50"
                           >
-                            Reject
+                            Ask for changes
                           </button>
                         </>
                       )}

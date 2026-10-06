@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useDeepLinkId } from "@/hooks/useDeepLinkId";
 import { Plus } from "lucide-react";
 import { errorMessage } from "@/lib/api-client";
 import { usePagedList } from "@/hooks/usePagedList";
@@ -100,6 +101,13 @@ function BoardView({ scope, isReady, scopeError }: { scope: ActivityScope; isRea
   const [formState, setFormState] = useState<{ editing: ApiActivity | null } | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [viewingId, setViewingId] = useState<string | null>(null);
+  // A notification's link (?activityId=) opens that activity.
+  const [linkedActivityId, consumeLinkedActivity] = useDeepLinkId("activityId");
+  useEffect(() => {
+    if (!linkedActivityId) return;
+    setViewingId(linkedActivityId);
+    consumeLinkedActivity();
+  }, [linkedActivityId, consumeLinkedActivity]);
   const [evidenceFor, setEvidenceFor] = useState<ApiActivity | null>(null);
   const [confirming, setConfirming] = useState<{ action: ConfirmableAction; activity: ApiActivity } | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);

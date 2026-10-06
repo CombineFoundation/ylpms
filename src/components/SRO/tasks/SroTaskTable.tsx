@@ -30,6 +30,8 @@ type SroTaskTableProps = {
   onViewSubmission?: (task: SroTaskRow) => void;
   /** "mine": take back a submission before it's reviewed. */
   onWithdraw?: (task: SroTaskRow) => void;
+  /** Opens the task's details (full description, feedback, actions). */
+  onOpen?: (task: SroTaskRow) => void;
 };
 
 /**
@@ -58,6 +60,7 @@ export function SroTaskTable({
   onSubmit,
   onViewSubmission,
   onWithdraw,
+  onOpen,
 }: SroTaskTableProps) {
   const colSpan = 6;
 
@@ -83,7 +86,13 @@ export function SroTaskTable({
             tasks.map((t) => (
               <tr key={t.id} className="hover:bg-gray-50/60">
                 <td className="px-5 py-3.5">
-                  <p className="font-medium text-gray-900">{t.title}</p>
+                  {onOpen ? (
+                    <button type="button" onClick={() => onOpen(t)} className="text-left font-medium text-gray-900 hover:text-brand hover:underline">
+                      {t.title}
+                    </button>
+                  ) : (
+                    <p className="font-medium text-gray-900">{t.title}</p>
+                  )}
                   <p className="mt-0.5 line-clamp-1 max-w-xs text-xs text-gray-400">{t.description}</p>
                   {t.status === "changes-requested" && t.review?.note && (
                     <p className="mt-1 line-clamp-2 max-w-xs text-xs text-brand-dark">

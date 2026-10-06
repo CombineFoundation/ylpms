@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutGrid, Bell, ChevronRight } from "lucide-react";
+import { LayoutGrid, Bell, ChevronRight, Trophy } from "lucide-react";
 import { useCurrentProfile } from "@/hooks/useCurrentProfile";
 import { useUnreadNotificationCount } from "@/hooks/useUnreadNotificationCount";
 import { getInitials } from "@/utils/user-status";
@@ -14,9 +14,12 @@ type PortalTopBarProps = {
   notificationsHref: string;
 };
 
-/** Top bar shared by the SRO, RO, Youth Leader and Volunteer portals: breadcrumb, notifications badge, avatar. */
+/** Top bar shared by the SRO, RO, Youth Leader and Volunteer portals: breadcrumb, leaderboard, notifications badge, avatar. */
 export function PortalTopBar({ pageLabelFor, notificationsHref }: PortalTopBarProps) {
   const pathname = usePathname();
+  // The leaderboard has no sidebar entry; it's opened from the trophy here, in the same portal.
+  const leaderboardHref = notificationsHref.replace(/\/notifications$/, "/leaderboard");
+  const onLeaderboard = pathname.startsWith(leaderboardHref);
   const { profile } = useCurrentProfile();
   const unreadCount = useUnreadNotificationCount();
 
@@ -26,10 +29,22 @@ export function PortalTopBar({ pageLabelFor, notificationsHref }: PortalTopBarPr
         <LayoutGrid size={15} />
         <span>YLPMS</span>
         <ChevronRight size={14} />
-        <span className="text-slate-600 font-medium">{pageLabelFor(pathname)}</span>
+        <span className="text-slate-600 font-medium">{onLeaderboard ? "Leaderboard" : pageLabelFor(pathname)}</span>
       </div>
 
       <div className="flex items-center gap-4">
+        {/* After their cohort ends, youth leaders and volunteers only have their certificates. */}
+        {!profile?.cohortAccess?.closed && (
+          <Link
+            href={leaderboardHref}
+            aria-label="Leaderboard"
+            title="Leaderboard"
+            aria-current={onLeaderboard ? "page" : undefined}
+            className={onLeaderboard ? "text-brand" : "text-slate-500 hover:text-slate-700"}
+          >
+            <Trophy size={19} />
+          </Link>
+        )}
         <Link
           href={notificationsHref}
           aria-label={unreadCount > 0 ? `Notifications (${unreadCount} unread)` : "Notifications"}

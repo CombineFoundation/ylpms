@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Award, Bell, Circle, FileText, CheckCircle2, UserPlus, Calendar, Trash2 } from "lucide-react";
 import type { NotificationType } from "@/types/notification.types";
+import { DEEP_LINK_PARAM } from "@/hooks/useDeepLinkId";
 import { formatRelativeTime } from "@/utils/user-status";
 import type { TimestampInput } from "@/utils/user-status";
 
@@ -13,6 +14,9 @@ export type NotificationRow = {
   message: string;
   read: boolean;
   actionUrl?: string;
+  /** What it's about, so the link can open that item, not just its list. */
+  relatedId?: string;
+  relatedType?: string;
   createdAt: TimestampInput;
 };
 
@@ -31,9 +35,17 @@ const iconByType: Record<NotificationType, typeof Bell> = {
   other: Bell,
 };
 
-/** Only follow links into this portal; anything else (other role areas, external) renders as plain text. */
-function safeActionUrl(portalPrefix: string, url?: string) {
-  return url && url.startsWith(portalPrefix) ? url : undefined;
+/**
+ * Only follow links into this portal; anything else (other role areas, external)
+ * renders as plain text. Links to a task, activity or report also carry its id,
+ * so the page opens that item (older notifications included).
+ */
+function safeActionUrl(portalPrefix: string, notification: NotificationRow) {
+  const url = notification.actionUrl;
+  if (!url || !url.startsWith(portalPrefix)) return undefined;
+  const param = notification.relatedType && DEEP_LINK_PARAM[notification.relatedType];
+  if (!param || !notification.relatedId || url.includes(`${param}=`)) return url;
+  return `${url}${url.includes("?") ? "&" : "?"}${param}=${encodeURIComponent(notification.relatedId)}`;
 }
 
 type NotificationItemProps = {
@@ -46,7 +58,7 @@ type NotificationItemProps = {
 
 export function NotificationItem({ notification, portalPrefix = "/Head-of-RO/", onMarkRead, onDelete }: NotificationItemProps) {
   const Icon = iconByType[notification.type] || Bell;
-  const href = safeActionUrl(portalPrefix, notification.actionUrl);
+  const href = safeActionUrl(portalPrefix, notification);
 
   const title = (
     <span className={`text-sm ${!notification.read ? "font-medium text-gray-800" : "text-gray-600"}`}>{notification.title}</span>

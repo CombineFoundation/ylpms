@@ -162,7 +162,7 @@ export const confirmUploadSchema = z.object({
   name: z.string().trim().min(1).max(200),
 });
 
-/** A PDF already uploaded via POST /api/reports/attachments. */
+/** A PDF or image already uploaded via POST /api/reports/attachments. */
 const attachmentSchema = z.object({
   path: z.string().min(1),
   name: z.string().trim().min(1).max(200),
@@ -186,7 +186,7 @@ export const activityWorkflowSchema = z.discriminatedUnion("action", [
     evidence: z.object({
       summary: z.string().trim().min(20, "Describe what happened in at least 20 characters").max(3000),
       participantIds: z.array(z.string().min(1)).min(1, "Select at least one participant").max(500),
-      attachments: z.array(attachmentSchema).max(5, "Attach at most 5 PDFs").default([]),
+      attachments: z.array(attachmentSchema).max(5, "Attach at most 5 files").default([]),
     }),
   }),
   z.object({
@@ -202,7 +202,7 @@ export const activityAttendanceSchema = z.object({ action: z.enum(["join", "leav
 /** The assignee hands in their work (sent to the assigner for review). */
 export const submitTaskSchema = z.object({
   note: z.string().trim().min(5, "Describe what you did in at least 5 characters").max(3000),
-  attachments: z.array(attachmentSchema).max(5, "Attach at most 5 PDFs").default([]),
+  attachments: z.array(attachmentSchema).max(5, "Attach at most 5 files").default([]),
 });
 
 /** The assigner accepts submitted work or sends it back with feedback. */
@@ -227,18 +227,18 @@ export const createReportSchema = z.object({
     achievements: z.array(z.string().min(3)).min(1, "At least one achievement required"),
     challenges: z.array(z.string().min(3)).min(1, "At least one challenge required"),
     metrics: z.record(z.number()),
-    /** PDFs already uploaded via POST /api/reports/attachments. */
-    attachments: z.array(attachmentSchema).max(5, "Attach at most 5 PDFs").optional(),
+    /** Files already uploaded via POST /api/reports/attachments. */
+    attachments: z.array(attachmentSchema).max(5, "Attach at most 5 files").optional(),
   }),
 });
 
-/** Reviewers can only move a report forward; drafting/submitting is the submitter's job. */
+/** The reviewer approves or asks for changes ("rejected"); drafting/submitting is the submitter's job. */
 export const updateReportStatusSchema = z.object({
-  status: z.enum(["reviewed", "approved", "rejected"]),
+  status: z.enum(["approved", "rejected"]),
   reviewComment: z.string().trim().max(1000, "Comment must be 1000 characters or fewer").optional(),
 }).refine(
   (data) => data.status !== "rejected" || (data.reviewComment && data.reviewComment.length >= 3),
-  { message: "Please give a reason for rejecting this report", path: ["reviewComment"] }
+  { message: "Please say what needs to change", path: ["reviewComment"] }
 );
 
 // Member requests (RO asks SRO for a youth leader; youth leader asks RO for a volunteer)

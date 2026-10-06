@@ -14,6 +14,7 @@ import {
   CreateReportRequest,
 } from "@/types/report.types";
 import { AuthorizationError, ConflictError, NotFoundError, ValidationError, logger } from "@/utils/errors";
+import { REVIEWER_TITLE, canReviewReport } from "@/utils/report-review";
 import { isInManagerChain } from "@/utils/authorization";
 import { createActivityLog } from "./activitylog.service";
 import {
@@ -90,7 +91,11 @@ export async function createReport(
   }
 }
 
-/** Head ROs, and the submitter's SRO (who reviews it), so a new or resubmitted report shows up without polling. */
+/**
+ * Tells the report's reviewer (the submitter's direct manager, or Head ROs for
+ * an SRO or someone with no manager) — an action item, so always sent. Head ROs
+ * who opted in also hear about everyone else's, for oversight.
+ */
 async function notifyReportReviewers(
   reportId: string,
   reportTitle: string,
@@ -100,27 +105,29 @@ async function notifyReportReviewers(
   try {
     const submitter = await getDocById<User>("users", submittedByUserId);
     const title = `${submitter?.name || "A user"} ${verb} a report for review`;
+    const managerId = submitter && "reportingToId" in submitter ? submitter.reportingToId : "";
+    const manager = managerId ? await getDocById<User>("users", managerId) : null;
     const headRoIds = (await getUserIdsByRoles(["head-ro", "developer"])).filter((id) => id !== submittedByUserId);
-    const recipients = await filterUsersByPreference(headRoIds, "report-submitted");
-    await notifyUsers(recipients, {
+    const headRoReviews = !manager || submitter?.role === "sro";
+
+    await notifyUsers(headRoReviews ? headRoIds : [manager.id], {
       type: "report-submitted",
       title,
-      message: reportTitle,
+      message: `${reportTitle} · approve it or ask for changes.`,
       relatedId: reportId,
       relatedType: "report",
-      actionUrl: "/Head-of-RO/reports",
+      actionUrl: headRoReviews ? "/Head-of-RO/reports" : REPORTS_ROUTE_BY_ROLE[manager.role],
     });
 
-    const sroId = submitter ? await findSroAbove(submitter) : null;
-    if (sroId && sroId !== submittedByUserId) {
-      // Review is an action item for the SRO, so it isn't preference-gated.
-      await notifyUsers([sroId], {
+    if (!headRoReviews) {
+      const watchers = await filterUsersByPreference(headRoIds.filter((id) => id !== manager.id), "report-submitted");
+      await notifyUsers(watchers, {
         type: "report-submitted",
         title,
         message: reportTitle,
         relatedId: reportId,
         relatedType: "report",
-        actionUrl: "/SRO/reports",
+        actionUrl: "/Head-of-RO/reports",
       });
     }
   } catch (error) {
@@ -175,16 +182,6 @@ export async function resubmitReport(
   await notifyReportReviewers(reportId, data.title, submittedByUserId, "resubmitted");
 
   return (await getReportById(reportId))!;
-}
-
-/** The SRO the user reports to, directly or through their RO / youth leader. */
-async function findSroAbove(user: User): Promise<string | null> {
-  let current: User | null = user;
-  for (let depth = 0; depth < 4 && current && "reportingToId" in current && current.reportingToId; depth++) {
-    current = await getDocById<User>("users", current.reportingToId);
-    if (current?.role === "sro") return current.id;
-  }
-  return null;
 }
 
 /** The submitter, Head RO / developer, or anyone above the submitter in their reporting chain. */
@@ -251,16 +248,29 @@ export async function enrichReportsForList<T extends { submittedBy: string }>(re
       submittedByName: submitter?.name || "Unknown",
       submittedByRegion: submitter?.region || "Unassigned",
       submittedByRole: submitter?.role,
+      /** Who reviews it (see utils/report-review.ts). */
+      submittedByManagerId: (submitter && "reportingToId" in submitter ? submitter.reportingToId : "") || "",
     };
   });
 }
 
+/** Only the submitter's reviewer (their direct manager; see utils/report-review.ts) may decide a report. */
+export async function requireReportReviewer(caller: { userId: string; role: UserRole }, report: Report): Promise<void> {
+  const submitter = await getDocById<User>("users", report.submittedBy);
+  const managerId = submitter && "reportingToId" in submitter ? submitter.reportingToId : "";
+  if (!canReviewReport(caller, { id: report.submittedBy, role: submitter?.role, managerId })) {
+    const reviewer = (submitter && REVIEWER_TITLE[submitter.role]) || "manager";
+    throw new AuthorizationError(`Only the submitter's ${reviewer} reviews this report`);
+  }
+}
+
 /**
- * Which review decisions are allowed from each status. Only submitted (or
- * already-reviewed) reports can be decided; approved/rejected are final.
+ * The reviewer approves a submitted report or asks for changes ("rejected",
+ * which the submitter can edit and resubmit). "reviewed" is a legacy status,
+ * decided the same way.
  */
 const ALLOWED_REVIEW_TRANSITIONS: Partial<Record<ReportStatus, ReportStatus[]>> = {
-  submitted: ["reviewed", "approved", "rejected"],
+  submitted: ["approved", "rejected"],
   reviewed: ["approved", "rejected"],
 };
 
@@ -291,9 +301,11 @@ export async function updateReportStatus(
     const allowed = ALLOWED_REVIEW_TRANSITIONS[report.status] || [];
     if (!allowed.includes(status)) {
       throw new ValidationError(
-        report.status === "approved" || report.status === "rejected"
-          ? `This report was already ${report.status}`
-          : `A ${report.status} report can't be marked ${status}`
+        report.status === "approved"
+          ? "This report was already approved"
+          : report.status === "rejected"
+            ? "Changes were already requested on this report"
+            : `A ${report.status} report can't be marked ${status}`
       );
     }
 
@@ -308,21 +320,21 @@ export async function updateReportStatus(
     await createActivityLog({
       userId: reviewedByUserId,
       action: "report-reviewed",
-      description: `Marked report "${report.title}" as ${status}`,
+      description: status === "approved" ? `Approved report "${report.title}"` : `Asked for changes on report "${report.title}"`,
       entityType: "report",
       entityId: reportId,
       changes: { status: { oldValue: report.status, newValue: status } },
     });
 
     // Let the submitter know the outcome (and why, if rejected).
-    if (report.submittedBy !== reviewedByUserId && status !== "reviewed") {
+    if (report.submittedBy !== reviewedByUserId) {
       try {
         const submitter = await getDocById<User>("users", report.submittedBy);
         await createNotification({
           userId: report.submittedBy,
           type: "other",
-          title: `Your report "${report.title}" was ${status}`,
-          message: reviewComment || (status === "approved" ? "No changes needed." : ""),
+          title: status === "approved" ? `Your report "${report.title}" was approved` : `Changes requested on "${report.title}"`,
+          message: reviewComment || (status === "approved" ? "No changes needed." : "Edit it and resubmit from your Reports page."),
           relatedId: reportId,
           relatedType: "report",
           actionUrl: submitter ? REPORTS_ROUTE_BY_ROLE[submitter.role] : undefined,

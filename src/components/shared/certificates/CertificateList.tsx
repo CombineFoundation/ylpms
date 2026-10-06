@@ -1,19 +1,19 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Award, Calendar, Download, MapPin } from "lucide-react";
+import { Award, Calendar, MapPin } from "lucide-react";
 import { usePortalData } from "@/hooks/usePortalScope";
 import type { ScopedRole } from "@/utils/portal-scope";
 import { PageHeader, SearchInput, emptyMessage } from "@/components/Head-of-RO/shared/ListParts";
 import { timestampToDate } from "@/utils/user-status";
-import { formatCertificateDate, kindLabels, printCertificate, type ApiCertificate } from "./certificate.types";
+import { formatCertificateDate, kindLabels, type ApiCertificate } from "./certificate.types";
+import { CertificateActions } from "./CertificateActions";
 
 /** The signed-in user's certificates, issued when activities they took part in are verified. */
 export function CertificateList({ portal }: { portal: ScopedRole }) {
   const { data, isLoading, error, reload } = usePortalData<ApiCertificate[]>(portal, "/api/certificates", "Unable to load certificates.");
   const certificates = useMemo(() => data ?? [], [data]);
   const [search, setSearch] = useState("");
-  const [popupBlocked, setPopupBlocked] = useState(false);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -54,12 +54,6 @@ export function CertificateList({ portal }: { portal: ScopedRole }) {
       <div className="sm:w-96">
         <SearchInput value={search} onChange={setSearch} placeholder="Search by activity or certificate number..." />
       </div>
-
-      {popupBlocked && (
-        <p role="alert" className="text-sm text-red-500">
-          Your browser blocked the certificate window. Allow pop-ups for this site and try again.
-        </p>
-      )}
 
       {isLoading && (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 animate-pulse" aria-busy="true" aria-label="Loading certificates">
@@ -111,14 +105,7 @@ export function CertificateList({ portal }: { portal: ScopedRole }) {
               </div>
               <div className="mt-4 flex items-center justify-between gap-3 border-t border-gray-100 pt-3">
                 <span className="font-mono text-[11px] text-gray-400">{certificate.certificateNumber}</span>
-                <button
-                  type="button"
-                  onClick={() => setPopupBlocked(!printCertificate(certificate))}
-                  className="flex items-center gap-1.5 rounded-md bg-brand px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-dark"
-                >
-                  <Download size={12} />
-                  Download PDF
-                </button>
+                <CertificateActions certificate={certificate} />
               </div>
             </article>
           ))}

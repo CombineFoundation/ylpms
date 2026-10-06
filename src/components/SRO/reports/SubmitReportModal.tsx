@@ -7,17 +7,17 @@ import { AttachedPdfList, PdfAttachmentPicker, ReviewerFeedback } from "@/compon
 import { zodResolver } from "@/lib/zod-resolver";
 import { FieldError, inputClass } from "@/components/Head-of-RO/shared/ListParts";
 import { reportTypeLabels, type ApiReport } from "@/components/Head-of-RO/reports/report-display.types";
-import { MAX_REPORT_ATTACHMENTS } from "@/lib/report-attachments";
+import { MAX_ATTACHMENTS } from "@/lib/report-attachments";
 import { submitReportSchema, toReportForm, type SubmitReportForm } from "./submit-report.types";
 import type { ReportAttachment } from "@/types/report.types";
 
 type SubmitReportModalProps = {
   isOpen: boolean;
   error: string | null;
-  /** e.g. "Uploading 1 of 2 PDFs..." while the parent uploads before submitting. */
+  /** e.g. "Uploading file 1 of 2..." while the parent uploads before submitting. */
   progress?: string | null;
   onClose: () => void;
-  /** `kept`: the PDFs already on a returned report that stay attached. */
+  /** `kept`: the files already on a returned report that stay attached. */
   onSubmit: (values: SubmitReportForm, files: File[], kept: ReportAttachment[]) => Promise<void>;
   /** Who receives and reviews the report. */
   reviewer?: string;
@@ -139,8 +139,8 @@ export function SubmitReportModal({
           files={files}
           onChange={setFiles}
           disabled={isSubmitting}
-          label={kept.length ? "Add PDFs" : undefined}
-          maxFiles={MAX_REPORT_ATTACHMENTS - kept.length}
+          label={kept.length ? "Add files" : undefined}
+          maxFiles={MAX_ATTACHMENTS - kept.length}
         />
         {progress && isSubmitting && <p className="text-sm text-gray-500">{progress}</p>}
         {error && (

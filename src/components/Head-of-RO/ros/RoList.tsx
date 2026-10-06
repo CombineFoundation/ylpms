@@ -8,8 +8,9 @@ import { RoFormModal } from "./RoFormModal";
 import type { Ro, RoForm } from "./ro.types";
 import { PageHeader, emptyMessage } from "../shared/ListParts";
 import { UserToolbar } from "../shared/UserToolbar";
+import { exportMembersCsv } from "../shared/exportMembers";
 import { useUserAdminActions } from "../shared/useUserAdminActions";
-import { matchesQuery, regionOptions, toUserRow, type ApiUser, type StatusFilter } from "../shared/users";
+import { matchesFilters, regionOptions, toUserRow, type ApiUser, type StatusFilter } from "../shared/users";
 
 export function RoList() {
   const [unassignedOnly, setUnassignedOnly] = useState(false);
@@ -21,8 +22,8 @@ export function RoList() {
   const ros = useMemo(() => list.items.map(toUserRow), [list.items]);
 
   const [query, setQuery] = useState("");
-  // Search runs on the client, so fetch the remaining pages while searching.
-  useLoadAllWhileSearching(list, query);
+  // A short list, so it's always loaded in full and the status/region filters see everyone.
+  useLoadAllWhileSearching(list, query, true);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("All");
   const [regionFilter, setRegionFilter] = useState("");
 
@@ -33,15 +34,19 @@ export function RoList() {
   const admin = useUserAdminActions("RO", list.reload);
 
   const filteredRos = useMemo(
-    () =>
-      ros.filter(
-        (ro) =>
-          matchesQuery(ro, query) &&
-          (statusFilter === "All" || ro.status === statusFilter) &&
-          (!regionFilter || ro.regionLabel === regionFilter)
-      ),
+    () => ros.filter((row) => matchesFilters(row, { query, statusFilter, regionFilter })),
     [ros, query, statusFilter, regionFilter]
   );
+
+  const exportCsv = () =>
+    exportMembersCsv({
+      path: `/api/users?role=ro${unassignedOnly ? "&unassigned=true" : ""}`,
+      keep: (row) => matchesFilters(row, { query, statusFilter, regionFilter }),
+      fileStem: "ros",
+      regionLabel: "Region",
+      managerLabel: "SRO",
+      teamLabel: "Youth leaders",
+    });
 
   const openAddModal = () => {
     setEditingRo(null);
@@ -99,6 +104,7 @@ export function RoList() {
       <PageHeader title="Reporting Officers" description="View and manage all Reporting Officers." />
 
       <UserToolbar
+        onExport={exportCsv}
         query={query}
         onQueryChange={setQuery}
         searchPlaceholder="Search ROs by name, email, SRO or region..."
@@ -122,6 +128,7 @@ export function RoList() {
         onEdit={openEditModal}
         onDelete={admin.requestDelete}
         onStatusChange={admin.requestStatusChange}
+        onSendReset={admin.requestPasswordReset}
       />
 
       <RoFormModal

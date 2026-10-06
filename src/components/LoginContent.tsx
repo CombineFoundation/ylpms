@@ -66,7 +66,10 @@ export default function LoginContent({ stats }: { stats: PublicStats }) {
       } as const;
 
       if (!role || !(role in routes)) {
-        throw new LoginError("Login succeeded, but no role was found in this user's profile.");
+        // Don't leave a half-signed-in session behind.
+        await signOut(getFirebaseAuth()).catch(() => undefined);
+        localStorage.removeItem("token");
+        throw new LoginError("This account isn't set up with a role yet. Contact your administrator.");
       }
 
       document.cookie = `role=${role}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Lax`;
