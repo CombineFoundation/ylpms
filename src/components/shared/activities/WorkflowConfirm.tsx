@@ -21,10 +21,17 @@ type Config = {
 const CONFIG: Record<ConfirmableAction, Config> = {
   submit: {
     title: "Submit for approval?",
-    message: (a) => `"${a.title}" goes to your RO for review. You can't edit it while it's awaiting approval.`,
+    message: (a) => `"${a.title}" goes to your RO for review. To change it while it's awaiting approval, withdraw it to draft.`,
     confirmLabel: "Submit",
     tone: "primary",
     done: (a) => `"${a.title}" was submitted for approval.`,
+  },
+  withdraw: {
+    title: "Withdraw to draft?",
+    message: (a) => `"${a.title}" comes back to you as a draft so you can change it. Submit it again when it's ready.`,
+    confirmLabel: "Withdraw",
+    tone: "primary",
+    done: (a) => `"${a.title}" is a draft again.`,
   },
   approve: {
     title: "Approve activity?",
@@ -54,7 +61,7 @@ const CONFIG: Record<ConfirmableAction, Config> = {
     message: (a) =>
       `Confirms the evidence for "${a.title}" and issues a certificate to each of its ${
         a.evidence?.participantIds.length ?? 0
-      } participant(s) and the organizer. Check the evidence under “Details” first.`,
+      } participant(s) and the organizer (youth leaders and volunteers only). Check the evidence under “Details” first.`,
     confirmLabel: "Verify & issue",
     tone: "primary",
     comment: { label: "Note to the organizer (optional)" },
@@ -88,6 +95,7 @@ const CONFIG: Record<ConfirmableAction, Config> = {
 /** API action for each confirmable card action ("return" is "return-evidence" on the server). */
 const WORKFLOW_ACTION = {
   submit: "submit",
+  withdraw: "withdraw",
   approve: "approve",
   reject: "reject",
   start: "start",

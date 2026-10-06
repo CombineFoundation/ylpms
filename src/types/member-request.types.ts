@@ -1,5 +1,6 @@
 import { Timestamp } from "firebase/firestore";
 import type { TimestampInput } from "@/utils/user-status";
+import type { MemberProfile } from "./user.types";
 
 /** Roles that are added by request rather than created directly. */
 export type MemberRequestRole = "youth-leader" | "volunteer";
@@ -22,6 +23,8 @@ export interface MemberRequest {
   /** The new member's ID: given by the requesting RO for a youth leader; a volunteer's is set on approval. */
   memberId?: string;
   university?: string;
+  /** Volunteer requests: their role in the team, typed by the youth leader. */
+  teamRole?: string;
   /** Who asked; becomes the new member's manager on approval. */
   requestedBy: string;
   requestedByName: string;
@@ -43,6 +46,8 @@ export type ApiMemberRequest = Omit<MemberRequest, "createdAt" | "updatedAt" | "
   createdAt?: TimestampInput;
   updatedAt?: TimestampInput;
   reviewedAt?: TimestampInput;
+  /** The requester's profile and chain, on the approver's list. */
+  requesterProfile?: MemberProfile;
 };
 
 export interface CreateMemberRequest {
@@ -52,4 +57,5 @@ export interface CreateMemberRequest {
   region?: string;
   memberId?: string;
   university?: string;
+  teamRole?: string;
 }

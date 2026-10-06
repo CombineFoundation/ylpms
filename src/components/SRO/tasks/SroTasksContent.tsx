@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Plus } from "lucide-react";
 import { apiFetch, errorMessage } from "@/lib/api-client";
-import { usePortalData, usePortalScope, type ScopedRole } from "@/hooks/usePortalScope";
+import { scopedPath, usePortalData, usePortalScope, type ScopedRole } from "@/hooks/usePortalScope";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import {
   ActionErrorBanner,
@@ -88,6 +88,7 @@ export function TeamTasksContent({ portal }: { portal: ScopedRole }) {
 
   const myTasks = useMemo(() => filterRows((data?.assignedToMe ?? []).map(toSroTaskRow)), [data, filterRows]);
   const teamTasks = useMemo(() => filterRows((data?.assignedByMe ?? []).map(toSroTaskRow)), [data, filterRows]);
+  const monthlyTasks = useMemo(() => filterRows((data?.teamMonthly ?? []).map(toSroTaskRow)), [data, filterRows]);
 
   function openAddModal() {
     setEditingTask(null);
@@ -120,6 +121,21 @@ export function TeamTasksContent({ portal }: { portal: ScopedRole }) {
       );
     } catch (error) {
       setActionError(errorMessage(error, `Unable to update "${task.title}".`));
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
+  /** Takes back a submission before it's reviewed, so it can be fixed and submitted again. */
+  const handleWithdraw = async (task: SroTaskRow) => {
+    setActionError(null);
+    setUpdatingId(task.id);
+    try {
+      await apiFetch(scopedPath(`/api/tasks/${task.id}/withdraw`, portal, selectedId), { method: "POST" });
+      setNotice(`"${task.title}" was withdrawn. Make your changes and submit it again.`);
+      load();
+    } catch (error) {
+      setActionError(errorMessage(error, `Unable to withdraw "${task.title}".`));
     } finally {
       setUpdatingId(null);
     }
@@ -206,6 +222,7 @@ export function TeamTasksContent({ portal }: { portal: ScopedRole }) {
           onStatusChange={handleStatusChange}
           onSubmit={setSubmittingTask}
           onViewSubmission={setViewingSubmission}
+          onWithdraw={handleWithdraw}
         />
       </section>
 
@@ -228,6 +245,27 @@ export function TeamTasksContent({ portal }: { portal: ScopedRole }) {
               setIsModalOpen(true);
             }}
             onDelete={setDeletingTask}
+            onViewSubmission={setViewingSubmission}
+          />
+        </section>
+      )}
+
+      {portal === "sro" && (
+        <section className="overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm">
+          <div className="border-b border-gray-100 px-5 py-4">
+            <h2 className="text-sm font-semibold text-gray-700">
+              Youth leaders&apos; monthly tasks {data && <span className="font-normal text-gray-400">({monthlyTasks.length})</span>}
+            </h2>
+            <p className="mt-0.5 text-xs text-gray-400">View only. Each youth leader&apos;s RO reviews these.</p>
+          </div>
+          <SroTaskTable
+            mode="view"
+            tasks={monthlyTasks}
+            isLoading={isLoading}
+            error={loadError}
+            emptyMessage={emptyMessage({ isFiltered, noun: "monthly tasks" })}
+            updatingId={null}
+            onStatusChange={() => {}}
             onViewSubmission={setViewingSubmission}
           />
         </section>

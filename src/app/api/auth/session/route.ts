@@ -1,5 +1,6 @@
 import { withAuth } from "@/middleware/auth.middleware";
 import { getUserById } from "@/services/user.service";
+import { cohortAccessFor } from "@/services/cohort.service";
 import { updateDoc } from "@/utils/firestore";
 import { apiError, apiSuccess } from "@/utils/api-response";
 import { AuthenticationError, logger } from "@/utils/errors";
@@ -33,6 +34,9 @@ export const POST = withAuth(async (req) => {
       role: req.user.role,
       name: user?.name || "",
       email: req.user.email,
+      mustChangePassword: !!user?.mustChangePassword,
+      // A youth leader or volunteer whose cohort ended can only open their certificates.
+      accessClosed: !!user && !!(await cohortAccessFor(user.role, user.cohortId))?.closed,
     });
   } catch (error) {
     return apiError(error);

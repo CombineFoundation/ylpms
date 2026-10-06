@@ -85,7 +85,7 @@ The SRO, RO, Youth Leader and Volunteer portals show one person's data. A user o
 
 ### Activity workflow (events → certificates)
 
-`src/services/event.service.ts` runs Create → Submit → Review → Approve → Conduct → Submit Evidence → Verify → Certificates. A youth leader's event starts as `draft`; their RO (or anyone above them in the chain) approves it and later verifies the evidence, which issues certificates (`src/services/certificate.service.ts`, `certificates` collection). Head RO, SRO and RO each have a Certificates page (`TeamCertificates`, `GET /api/certificates/team`) that groups their team's certificates by activity: one row led by the organizer's certificate, with participants in the details. Events organized by an RO or above start `planned` and complete when their organizer submits evidence. Status only changes through `POST /api/events/[eventId]/workflow`; the list endpoints return per-viewer `permissions` so the UI (`src/components/shared/activities/ActivityBoard.tsx`, used by every portal) never re-derives the rules.
+`src/services/activity.service.ts` runs Create → Submit → Review → Approve → Conduct → Submit Evidence → Verify → Certificates. A youth leader's activity starts as `draft`; their RO (or anyone above them in the chain) approves it and later verifies the evidence, which issues certificates (`src/services/certificate.service.ts`, `certificates` collection). Head RO, SRO and RO each have a Certificates page (`TeamCertificates`, `GET /api/certificates/team`) that groups their team's certificates by activity: one row led by the organizer's certificate, with participants in the details. Activities organized by an RO or above start `planned` and complete when their organizer submits evidence. Status only changes through `POST /api/activities/[activityId]/workflow`; the list endpoints return per-viewer `permissions` so the UI (`src/components/shared/activities/ActivityBoard.tsx`, used by every portal) never re-derives the rules.
 
 ### Member requests
 
@@ -96,6 +96,10 @@ Every new account gets a program ID (`memberId`, upper-case, unique; `src/utils/
 ### Cohorts and public stats
 
 The program runs in cohorts (`src/services/cohort.service.ts`, `cohorts` collection; YLP 2.0 = 15 Sep 2026 – 15 Mar 2027 is built in via `src/config/cohorts.ts` until its doc is written). The latest cohort is current: new youth leaders/volunteers get its `cohortId` (none = YLP 2.0), `withAuth` blocks youth leaders/volunteers outside a running current cohort, and monthly cycles restart from its start date. Head RO starts the next cohort from Settings once the current one has ended. The Home and Login pages show YLP 1.0's fixed figures (`YLP_1` in the config) plus live Firestore counts from `src/services/public-stats.service.ts` (cached 10 min; definitions in its header). Activities record `mode` (onsite / online = webinar). University and city fields only accept names from `src/config/hec-universities.ts` (hec.gov.pk list) and `src/config/pakistan-cities.ts`, picked with `SearchableSelect` (`src/components/shared/PlaceSelects.tsx`) and checked by `src/utils/places.ts`; for youth leaders and volunteers the `region` field holds their city.
+
+### Public applications
+
+The landing page's Apply buttons open `src/components/landing/ApplyModal.tsx`, which posts to `POST /api/applications` — the one public (no `withAuth`) write route. `src/services/application.service.ts` saves to the `applications` collection (doc id = reference number like `YLP-7K3QX9`, one per email); rules come from `src/utils/application-validation.ts`, shared with the form. The route has a honeypot field and a best-effort per-IP limit.
 
 ### Activities naming
 

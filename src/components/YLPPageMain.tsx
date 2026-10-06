@@ -1,10 +1,14 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useState } from "react";
-import { YLP_1 } from "@/config/cohorts";
+import { useCallback, useEffect, useState } from "react";
+import { YLP_1, YLP_2_SELECTION } from "@/config/cohorts";
 import { formatCount, formatProgramDate, formatReach } from "@/utils/impact-format";
 import type { PublicStats } from "@/types/public-stats.types";
+import CohortSection from "@/components/landing/CohortSection";
+import LeadershipMessage from "@/components/landing/LeadershipMessage";
+import ApplyModal from "@/components/landing/ApplyModal";
+import { landingFaqItems as faqItems } from "@/components/landing/landing-faq";
 
 const benefitCards = [
   {
@@ -65,41 +69,6 @@ const benefitCards = [
   },
 ];
 
-const faqItems = [
-  {
-    question: "What is YLP 2.0?",
-    answer: "YLP 2.0 is Pakistan&apos;s biggest youth leadership program by Combine Foundation, six-month journey helping university students build leadership, communication, project management, teamwork and professional skills through practical learning.",
-  },
-  {
-    question: "Who can apply for YLP 2.0?",
-    answer: "Any university student with Pakistani nationality can apply from any university, any academic discipline, and any gender.",
-  },
-  {
-    question: "What is the duration of the program?",
-    answer: "YLP 2.0 is a six-month leadership program consisting of workshops, mentoring, networking, community involvement and other leadership development opportunities.",
-  },
-  {
-    question: "Is YLP 2.0 online or offline?",
-    answer: "YLP 2.0 is a combination of physical and online events.",
-  },
-  {
-    question: "Will I receive a certificate after completing the program?",
-    answer: "Yes. Successful candidates are awarded a certificate by Combine Foundation, along with an experience letter and a recommendation letter.",
-  },
-  {
-    question: "What makes YLP 2.0 different from other leadership programs?",
-    answer: "YLP 2.0 is built around practical learning, students work on real projects instead of purely theoretical training.",
-  },
-  {
-    question: "Is there any previous success in the Youth Leadership Program?",
-    answer: `Yes. YLP 1.0 (${formatProgramDate(YLP_1.startDate)} – ${formatProgramDate(YLP_1.endDate)}) engaged ${YLP_1.youthLeaders} Youth Leaders and ${YLP_1.volunteers} volunteers from ${YLP_1.universities} universities across ${YLP_1.cities} cities, reaching ${formatCount(YLP_1.directBeneficiaries)} direct beneficiaries.`,
-  },
-  {
-    question: "How do I become part of YLP 2.0?",
-    answer: "Apply through the official Combine Foundation application form. Visit the official website or social media pages for the latest updates and deadlines.",
-  },
-];
-
 const galleryItems = [
   {
     src: "/assets/gallery/6.jpeg",
@@ -126,7 +95,7 @@ const galleryItems = [
   },
   {
     src: "/assets/gallery/3.jpg",
-    alt: "Community outreach event",
+    alt: "Community outreach activity",
     caption: "Community Outreach & Awareness Program",
     classes: "g-wide",
   },
@@ -160,6 +129,12 @@ export default function YLPPageMain({ stats }: { stats: PublicStats }) {
   ];
   const [menuOpen, setMenuOpen] = useState(false);
   const [openFaqIndex, setOpenFaqIndex] = useState(0);
+  const [applyOpen, setApplyOpen] = useState(false);
+  const openApply = () => {
+    setMenuOpen(false);
+    setApplyOpen(true);
+  };
+  const closeApply = useCallback(() => setApplyOpen(false), []);
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -192,24 +167,21 @@ export default function YLPPageMain({ stats }: { stats: PublicStats }) {
               <a href="#about">About</a>
               <a href="#benefits">Benefits</a>
               <a href="#gallery">Gallery</a>
+              <a href="#cohort">Cohort</a>
+              <a href="#message">Leadership</a>
               <a href="#eligibility">Eligibility</a>
               <a href="#faq">FAQs</a>
             </div>
             <div className="nav-cta">
               <a
-                className="text-sm font-semibold text-white hover:text-gray-200"
+                className="text-sm font-semibold text-brand-navy transition-colors hover:text-brand"
                 href="/login"
               >
                 Sign In
               </a>
-              <a
-                className="btn btn-primary"
-                href="https://forms.gle/AGwTL41qL55nENdE8"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
+              <button type="button" className="btn btn-primary" onClick={openApply}>
                 Apply Now
-              </a>
+              </button>
               <button
                 className="menu-toggle"
                 id="menuToggle"
@@ -235,19 +207,16 @@ export default function YLPPageMain({ stats }: { stats: PublicStats }) {
                 What if in six months, your <em>future</em> changes forever?
               </h1>
               <p className="lead">
-                YLP 2.0 by Combine Foundation is a free, six-month national
+                YLP by Combine Foundation is a free, six-month national
                 leadership journey turning university students into confident
-                leaders through real projects, mentorship, and community impact.
+                leaders through real projects, mentorship, and community impact.{" "}
+                {YLP_2_SELECTION.youthLeaders} Youth Leaders from {YLP_2_SELECTION.universities} universities
+                are already on the path.
               </p>
               <div className="hero-actions">
-                <a
-                  className="btn btn-primary"
-                  href="https://forms.gle/AGwTL41qL55nENdE8"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  Apply for YLP 2.0 →
-                </a>
+                <button type="button" className="btn btn-primary" onClick={openApply}>
+                  Apply for YLP
+                </button>
                 <a className="btn btn-outline" href="#about">
                   Learn More
                 </a>
@@ -359,7 +328,7 @@ export default function YLPPageMain({ stats }: { stats: PublicStats }) {
               <div className="about-pills">
                 {[
                   "6-month journey",
-                  "Physical + online events",
+                  "Physical + online activities",
                   "Certificate on completion",
                   "Open to all disciplines",
                 ].map((text) => (
@@ -490,6 +459,10 @@ export default function YLPPageMain({ stats }: { stats: PublicStats }) {
           </div>
         </section>
 
+        <CohortSection />
+
+        <LeadershipMessage />
+
         <section className="eligibility" id="eligibility">
           <div className="container elig-grid">
             <div className="reveal">
@@ -531,14 +504,9 @@ export default function YLPPageMain({ stats }: { stats: PublicStats }) {
               <p>
                 It&apos;s about investing your time, passion, energy and dedication into making yourself and the lives of others better. If you believe leadership is about making a difference, not holding a position, this is your chance.
               </p>
-              <a
-                className="btn btn-primary"
-                href="https://forms.gle/AGwTL41qL55nENdE8"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                Apply for YLP 2.0 →
-              </a>
+              <button type="button" className="btn btn-primary" onClick={openApply}>
+                Apply for YLP
+              </button>
             </div>
           </div>
         </section>
@@ -553,7 +521,7 @@ export default function YLPPageMain({ stats }: { stats: PublicStats }) {
               <p style={{ color: "var(--gray)", fontSize: "1.05rem" }}>
                 YLP 2.0 stands on a strong foundation. The first chapter of the Youth Leadership Program ran from{" "}
                 {formatProgramDate(YLP_1.startDate)} to {formatProgramDate(YLP_1.endDate)}, engaging students through webinars,
-                campaigns, university collaborations and community events across {ylp1.cities} cities, with{" "}
+                campaigns, university collaborations and community activities across {ylp1.cities} cities, with{" "}
                 {ylp1.studentBodyPartnerships} student body partnerships and a digital reach of {formatReach(ylp1.digitalReach)}.
               </p>
             </div>
@@ -672,9 +640,9 @@ export default function YLPPageMain({ stats }: { stats: PublicStats }) {
           <div className="container reveal">
             <h2>Don&apos;t wait for change. Be the change.</h2>
             <p>Join Pakistan&apos;s largest youth leadership program and become part of a generation that doesn&apos;t wait for change. Let&apos;s create it.</p>
-            <a className="btn btn-final" href="https://forms.gle/AGwTL41qL55nENdE8" target="_blank" rel="noopener noreferrer">
-              Apply for YLP 2.0 →
-            </a>
+            <button type="button" className="btn btn-final" onClick={openApply}>
+              Apply for YLP
+            </button>
           </div>
         </section>
 
@@ -693,6 +661,8 @@ export default function YLPPageMain({ stats }: { stats: PublicStats }) {
                 <ul>
                   <li><a href="#about">About YLP 2.0</a></li>
                   <li><a href="#benefits">Benefits</a></li>
+                  <li><a href="#cohort">YLP 2.0 in numbers</a></li>
+                  <li><a href="#message">Message from the Head of ROs</a></li>
                   <li><a href="#eligibility">Eligibility</a></li>
                   <li><a href="#faq">FAQs</a></li>
                 </ul>
@@ -700,18 +670,20 @@ export default function YLPPageMain({ stats }: { stats: PublicStats }) {
               <div>
                 <h5>Get Involved</h5>
                 <ul>
-                  <li><a href="https://forms.gle/AGwTL41qL55nENdE8" target="_blank" rel="noopener noreferrer">Apply as Youth Leader</a></li>
+                  <li><a href="#apply" onClick={(event) => { event.preventDefault(); openApply(); }}>Apply as Youth Leader</a></li>
                   <li><a href="#top">Back to top</a></li>
                 </ul>
               </div>
             </div>
             <div className="footer-bottom">
               <span>© 2026 Combine Foundation. All rights reserved.</span>
-              <span>Youth Leadership Program (YLP) 2.0</span>
+              <span>Youth Leadership Program (YLP)</span>
             </div>
           </div>
         </footer>
       </main>
+
+      <ApplyModal open={applyOpen} onClose={closeApply} />
 
       <style jsx global>{`
         :root{
@@ -734,6 +706,7 @@ export default function YLPPageMain({ stats }: { stats: PublicStats }) {
         }
         *{box-sizing:border-box;margin:0;padding:0;}
         html{scroll-behavior:smooth;}
+        .landing{--ff-display:var(--font-sora),'Sora',sans-serif;--ff-body:var(--font-inter),'Inter',sans-serif;font-family:var(--ff-body);}
         @media (prefers-reduced-motion: reduce){ html{scroll-behavior:auto;} *{animation-duration:0.001ms !important; transition-duration:0.001ms !important;} }
         body{font-family:var(--ff-body);background:var(--bg);color:var(--navy);line-height:1.6;-webkit-font-smoothing:antialiased;overflow-x:hidden;}
         img{max-width:100%;display:block;}
@@ -843,6 +816,85 @@ export default function YLPPageMain({ stats }: { stats: PublicStats }) {
         .i-card{background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:18px;padding:30px 0px;text-align:center;}
         .i-card .num{font-family:var(--ff-display);font-weight:800;font-size:2.1rem;color:var(--secondary);}
         .i-card .lbl{margin-top:8px;font-size:0.9rem;color:#c7d3dd;}
+        .cohort{background:var(--white);}
+        .cohort-top{display:grid;grid-template-columns:repeat(4,1fr);gap:22px;margin-bottom:46px;}
+        .c-stat{border:1px solid var(--border);border-radius:var(--radius);padding:26px 24px;background:var(--bg);}
+        .c-stat .num{font-family:var(--ff-display);font-weight:800;font-size:2.4rem;color:var(--secondary);line-height:1;}
+        .c-stat .lbl{margin-top:10px;font-weight:600;color:var(--navy);font-size:0.98rem;}
+        .c-stat .sub{margin-top:4px;font-size:0.82rem;color:var(--gray-light);}
+        .c-stat:nth-child(even) .num{color:var(--primary);}
+        .cohort-grid{display:grid;grid-template-columns:1.25fr 0.75fr;gap:34px;align-items:start;}
+        .panel{border:1px solid var(--border);border-radius:var(--radius);padding:30px;background:var(--white);}
+        .panel h3{font-size:1.15rem;margin-bottom:6px;color:var(--navy);}
+        .panel .panel-note{font-size:0.86rem;color:var(--gray-light);margin-bottom:24px;}
+        .bar-row{display:grid;grid-template-columns:120px 1fr 92px;align-items:center;gap:14px;margin-bottom:16px;}
+        .bar-row:last-child{margin-bottom:0;}
+        .bar-name{font-size:0.9rem;font-weight:600;color:var(--navy);}
+        .bar-track{height:12px;border-radius:100px;background:var(--bg);border:1px solid var(--border);overflow:hidden;}
+        .bar-fill{display:block;height:100%;border-radius:100px;background:var(--secondary);width:0;transition:width 1.1s cubic-bezier(.22,.8,.3,1);}
+        .panel.in .bar-fill{width:var(--w);}
+        .bar-row:nth-child(even) .bar-fill{background:var(--primary);}
+        .bar-val{font-size:0.85rem;color:var(--gray);text-align:right;font-variant-numeric:tabular-nums;}
+        .bar-val b{color:var(--navy);font-weight:700;}
+        .split{margin-bottom:26px;}
+        .split:last-of-type{margin-bottom:0;}
+        .split h4{font-size:0.95rem;margin-bottom:12px;color:var(--navy);}
+        .split-bar{display:flex;height:34px;border-radius:10px;overflow:hidden;border:1px solid var(--border);}
+        .split-bar span{display:flex;align-items:center;justify-content:center;font-size:0.78rem;font-weight:700;color:#fff;white-space:nowrap;}
+        .split-a{background:var(--secondary);}
+        .split-b{background:var(--primary);}
+        .split-legend{display:flex;flex-wrap:wrap;gap:16px;margin-top:12px;font-size:0.84rem;color:var(--gray);}
+        .split-legend i{width:10px;height:10px;border-radius:3px;display:inline-block;margin-right:7px;}
+        .message{background:var(--bg);}
+        .message-card{display:grid;grid-template-columns:300px 1fr;gap:0;background:var(--white);border:1px solid var(--border);border-radius:24px;overflow:hidden;box-shadow:var(--shadow);}
+        .message-side{background:linear-gradient(160deg, rgba(4, 36, 54, 0.65) 0%, rgba(3, 81, 121, 0.55) 100%),url("/assets/Umar.png") center 20% / cover no-repeat;color:#fff;padding:40px 32px;display:flex;flex-direction:column;justify-content:flex-end;gap:18px;}
+        .message-avatar{width:96px;height:96px;border-radius:50%;background:rgba(255,255,255,0.14);border:2px solid rgba(255,255,255,0.35);display:flex;align-items:center;justify-content:center;overflow:hidden;}
+        .message-avatar img{width:100%;height:100%;object-fit:cover;border-radius:50%;}
+        .message-side .m-name{font-family:var(--ff-display);font-weight:800;font-size:1.25rem;}
+        .message-side .m-role{font-size:0.88rem;color:#d6ecf8;margin-top:4px;}
+        .message-side .m-org{margin-top:14px;padding-top:14px;border-top:1px solid rgba(255,255,255,0.22);font-size:0.82rem;color:#cfe7f5;}
+        .message-body{padding:46px 48px;}
+        .message-body .quote-mark{font-family:var(--ff-display);font-size:3.4rem;line-height:0.6;color:var(--secondary);display:block;margin-bottom:18px;}
+        .message-body p{color:var(--gray);font-size:1.06rem;margin-bottom:18px;}
+        .message-body p:last-child{margin-bottom:0;}
+        .message-body strong{color:var(--navy);font-weight:600;}
+        .modal{position:fixed;inset:0;z-index:200;display:none;align-items:center;justify-content:center;padding:24px;background:rgba(17,24,39,0.62);backdrop-filter:blur(4px);}
+        .modal.open{display:flex;}
+        body.modal-open{overflow:hidden;}
+        .modal-card{width:100%;max-width:520px;background:var(--white);border-radius:22px;box-shadow:0 30px 70px -20px rgba(0,0,0,0.45);max-height:92vh;overflow-y:auto;animation:modalIn .25s ease;}
+        @keyframes modalIn{from{opacity:0;transform:translateY(14px) scale(.98);}to{opacity:1;transform:none;}}
+        @media (prefers-reduced-motion: reduce){.modal-card{animation:none;}}
+        .modal-head{position:relative;padding:32px 34px 24px;border-bottom:1px solid var(--border);}
+        .modal-head h3{font-size:1.45rem;margin-bottom:8px;color:var(--navy);}
+        .modal-head p{font-size:0.94rem;color:var(--gray);max-width:380px;}
+        .modal-close{position:absolute;top:20px;right:20px;width:38px;height:38px;border-radius:50%;border:1px solid var(--border);background:var(--white);cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--gray);font-size:1.1rem;line-height:1;transition:background .2s,color .2s;}
+        .modal-close:hover{background:var(--navy);color:#fff;}
+        .modal-close:focus-visible{outline:3px solid var(--primary);outline-offset:2px;}
+        .modal-body{padding:28px 34px 34px;}
+        .field{margin-bottom:20px;}
+        .field label{display:block;font-weight:600;font-size:0.9rem;margin-bottom:8px;color:var(--navy);}
+        .field label .req{color:var(--secondary);}
+        .field input{width:100%;padding:14px 16px;border:1.5px solid var(--border);border-radius:12px;font-family:var(--ff-body);font-size:0.98rem;color:var(--navy);background:var(--white);transition:border-color .2s, box-shadow .2s;}
+        .field input::placeholder{color:#aeb5c0;}
+        .field input:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 4px var(--primary-tint);}
+        .field input[aria-invalid="true"]{border-color:#d92d20;}
+        .field .hint{font-size:0.78rem;color:var(--gray-light);margin-top:6px;}
+        .field .error{font-size:0.8rem;color:#d92d20;margin-top:6px;display:none;}
+        .field .error.show{display:block;}
+        .modal-body .btn{width:100%;margin-top:6px;}
+        .btn[disabled]{opacity:0.65;cursor:not-allowed;transform:none !important;}
+        .form-note{font-size:0.78rem;color:var(--gray-light);text-align:center;margin-top:16px;line-height:1.5;}
+        .form-status{display:none;padding:14px 16px;border-radius:12px;font-size:0.9rem;margin-bottom:20px;}
+        .form-status.show{display:block;}
+        .form-status.error{background:#fef3f2;border:1px solid #fecdc9;color:#b42318;}
+        .form-status.info{background:var(--primary-tint);border:1px solid #bfe3f5;color:#0b5f87;}
+        .form-success{display:none;text-align:center;padding:14px 0 6px;}
+        .form-success.show{display:block;}
+        .success-mark{width:68px;height:68px;border-radius:50%;background:var(--secondary-tint);display:flex;align-items:center;justify-content:center;margin:0 auto 20px;}
+        .success-mark svg{width:32px;height:32px;stroke:var(--secondary);fill:none;stroke-width:2.5;}
+        .form-success h4{font-size:1.3rem;margin-bottom:10px;color:var(--navy);}
+        .form-success p{color:var(--gray);font-size:0.96rem;margin-bottom:22px;}
+        .form-success .ref{display:inline-block;font-family:var(--ff-display);font-weight:700;background:var(--bg);border:1px dashed var(--border);border-radius:10px;padding:10px 18px;color:var(--navy);margin-bottom:22px;letter-spacing:0.04em;}
         .eligibility{background:var(--white);}
         .elig-grid{display:grid;grid-template-columns:1fr 1fr;gap:56px;align-items:center;}
         .elig-list{display:grid;gap:16px;}
@@ -911,6 +963,9 @@ export default function YLPPageMain({ stats }: { stats: PublicStats }) {
         .reveal.in{opacity:1;transform:translateY(0);}
         @media (max-width:980px){.nav-links{display:none;}.menu-toggle{display:block;}.hero .container{grid-template-columns:1fr;}.hero-visual{height:320px;order:-1;}.about-grid,.why-grid,.elig-grid,.legacy-grid{grid-template-columns:1fr;}.benefit-grid{grid-template-columns:repeat(2,1fr);}.impact-grid{grid-template-columns:repeat(2,1fr);}.journey-steps{grid-template-columns:repeat(3,1fr);row-gap:36px;}.journey-track svg.line{display:none;}.footer-grid{grid-template-columns:1fr;}.gallery-grid{grid-template-columns:1fr 1fr;grid-template-rows:auto;}.g-tall{grid-row:auto;}.g-item img{min-height:200px;}.events-grid{grid-template-columns:repeat(2,1fr);}}
         @media (max-width:560px){section{padding:70px 0;}.benefit-grid{grid-template-columns:1fr;}.impact-grid{grid-template-columns:1fr 1fr;}.journey-steps{grid-template-columns:1fr 1fr;}.hero{padding:70px 0 100px;}.hero-stats{gap:22px;}.gallery-grid{grid-template-columns:1fr;}.events-grid{grid-template-columns:1fr 1fr;}}
+        @media (max-width:980px){.cohort-top{grid-template-columns:repeat(2,1fr);}.cohort-grid{grid-template-columns:1fr;}.message-card{grid-template-columns:1fr;}.message-side{flex-direction:row;align-items:center;justify-content:flex-start;padding:30px 32px;}.message-body{padding:34px 32px;}}
+        @media (max-width:560px){.cohort-top{grid-template-columns:1fr 1fr;gap:14px;}.c-stat{padding:20px 18px;}.c-stat .num{font-size:1.9rem;}.panel{padding:24px 20px;}.bar-row{grid-template-columns:92px 1fr;row-gap:6px;}.bar-val{grid-column:1 / -1;text-align:left;}.message-side{flex-direction:column;align-items:flex-start;}.message-body{padding:28px 22px;}.modal{padding:0;align-items:flex-end;}.modal-card{max-width:none;border-radius:22px 22px 0 0;max-height:94vh;}.modal-head{padding:26px 22px 20px;}.modal-body{padding:24px 22px 30px;}}
+        @media (max-width:1100px) and (min-width:981px){.nav-links{gap:20px;}.nav-links a{font-size:0.9rem;}}
       `}</style>
     </>
   );

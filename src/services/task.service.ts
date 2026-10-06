@@ -1,6 +1,7 @@
 import {
   createDoc,
   updateDoc,
+  updateDocIfStatus,
   deleteDocFromFirestore,
   queryPage,
   getDocById,
@@ -24,9 +25,10 @@ import { timestampToDate, type TimestampInput } from "@/utils/user-status";
 import { createActivityLog } from "./activitylog.service";
 import { createNotification, isNotificationEnabled } from "./notification.service";
 import type { User, UserRole } from "@/types/user.types";
-import type { Event } from "@/types/event.types";
-import { OPEN_ACTIVITY_STATUSES } from "@/types/event.types";
+import type { Activity } from "@/types/activity.types";
+import { OPEN_ACTIVITY_STATUSES } from "@/types/activity.types";
 import { toDate } from "@/utils/aggregation";
+import { formatDate } from "@/utils/format-date";
 
 /**
  * Task Service - Handles all task-related operations
@@ -74,7 +76,7 @@ async function notifyAssignee(task: { id: string; title: string; dueDate: Date }
       userId: assignee.id,
       type: "task-assigned",
       title: `${assigner?.name || "Someone"} assigned you a task`,
-      message: `${task.title} · due ${task.dueDate.toLocaleDateString()}`,
+      message: `${task.title} · due ${formatDate(task.dueDate)}`,
       relatedId: task.id,
       relatedType: "task",
       actionUrl: TASKS_ROUTE_BY_ROLE[assignee.role],
@@ -95,16 +97,16 @@ async function notifyAssignee(task: { id: string; title: string; dueDate: Date }
  * to store on the task.
  */
 async function resolveLinkedActivity(eventId: string, assignerId: string): Promise<{ eventId: string; eventTitle: string }> {
-  const event = await getDocById<Event>("events", eventId);
-  if (!event) throw new NotFoundError("Activity not found");
-  if (!(event.organizerIds ?? []).includes(assignerId)) {
+  const activity = await getDocById<Activity>("events", eventId);
+  if (!activity) throw new NotFoundError("Activity not found");
+  if (!(activity.organizerIds ?? []).includes(assignerId)) {
     throw new AuthorizationError("You can only link a task to an activity you organize");
   }
-  const end = toDate(event.endDate);
-  if (!OPEN_ACTIVITY_STATUSES.includes(event.status) || (end && end <= new Date())) {
-    throw new ValidationError(`"${event.title}" isn't open any more, so tasks can't be linked to it`);
+  const end = toDate(activity.endDate);
+  if (!OPEN_ACTIVITY_STATUSES.includes(activity.status) || (end && end <= new Date())) {
+    throw new ValidationError(`"${activity.title}" isn't open any more, so tasks can't be linked to it`);
   }
-  return { eventId, eventTitle: event.title };
+  return { eventId, eventTitle: activity.title };
 }
 
 export async function createTask(
@@ -259,7 +261,14 @@ export async function updateTask(
     if (update.status === "completed") update.completedDate = new Date();
     else if (update.status && task.status === "completed") update.completedDate = null;
 
-    await updateDoc<Task>("tasks", taskId, update as unknown as Partial<Task>);
+    // A status change only goes through if nobody else changed the status since it was read.
+    if (update.status) {
+      if (!(await updateDocIfStatus<Task>("tasks", taskId, task.status, update as unknown as Partial<Task>))) {
+        throw new ConflictError(`"${task.title}" was just updated by someone else — refresh and try again`);
+      }
+    } else {
+      await updateDoc<Task>("tasks", taskId, update as unknown as Partial<Task>);
+    }
 
     const changes: Record<string, { oldValue: unknown; newValue: unknown }> = {};
     if (update.status && update.status !== task.status) {
@@ -332,8 +341,9 @@ export async function submitTask(
   assigneeId: string,
   actorUserId: string = assigneeId
 ): Promise<Task> {
-  const task = await getTaskById(taskId);
-  if (!task) throw new NotFoundError(`Task ${taskId} not found`);
+  const stored = await getDocById<Task>("tasks", taskId);
+  if (!stored) throw new NotFoundError(`Task ${taskId} not found`);
+  const task = withEffectiveStatus(stored);
   if (task.assignedTo !== assigneeId) throw new AuthorizationError("Only the person this task is assigned to can submit it");
   if (task.status === "cancelled") throw new ConflictError("This task was cancelled");
   if (needsReview(task) && task.status === "completed") throw new ConflictError("This task was already accepted");
@@ -348,7 +358,10 @@ export async function submitTask(
       : updateTask(taskId, { status: "completed" }, actorUserId);
   }
 
-  await updateDoc<Task>("tasks", taskId, { submission, status: "submitted" } as Partial<Task>);
+  // Only if nobody reviewed or cancelled it since it was read.
+  if (!(await updateDocIfStatus<Task>("tasks", taskId, stored.status, { submission, status: "submitted" } as Partial<Task>))) {
+    throw new ConflictError(`"${task.title}" was just updated by someone else — refresh and try again`);
+  }
 
   await createActivityLog({
     userId: actorUserId,
@@ -359,26 +372,50 @@ export async function submitTask(
     changes: task.status !== "submitted" ? { status: { oldValue: task.status, newValue: "submitted" } } : undefined,
   });
 
+  // Review is an action item for the assigner, so it's always sent (not preference-gated), like member requests.
   try {
-    if (await isNotificationEnabled(task.assignedBy, "task-completed")) {
-      const [assignee, assigner] = await Promise.all([
-        getDocById<User>("users", task.assignedTo),
-        getDocById<User>("users", task.assignedBy),
-      ]);
-      await createNotification({
-        userId: task.assignedBy,
-        type: "task-completed",
-        title: `${assignee?.name || "Someone"} submitted a task for your review`,
-        message: task.title,
-        relatedId: taskId,
-        relatedType: "task",
-        actionUrl: assigner ? TASKS_ROUTE_BY_ROLE[assigner.role] : undefined,
-      });
-    }
+    const [assignee, assigner] = await Promise.all([
+      getDocById<User>("users", task.assignedTo),
+      getDocById<User>("users", task.assignedBy),
+    ]);
+    await createNotification({
+      userId: task.assignedBy,
+      type: "task-completed",
+      title: `${assignee?.name || "Someone"} submitted a task for your review`,
+      message: task.title,
+      relatedId: taskId,
+      relatedType: "task",
+      actionUrl: assigner ? TASKS_ROUTE_BY_ROLE[assigner.role] : undefined,
+    });
   } catch (error) {
     logger.error(`Failed to notify ${task.assignedBy} of task submission`, error);
   }
 
+  return (await getTaskById(taskId))!;
+}
+
+/**
+ * The assignee takes back work they submitted, before it's reviewed (e.g. a
+ * wrong file). The task returns to "in progress" and keeps the submission, so
+ * resubmitting starts from it. `assigneeId` is who it's withdrawn as.
+ */
+export async function withdrawTaskSubmission(taskId: string, assigneeId: string, actorUserId: string = assigneeId): Promise<Task> {
+  const task = await getDocById<Task>("tasks", taskId);
+  if (!task) throw new NotFoundError(`Task ${taskId} not found`);
+  if (task.assignedTo !== assigneeId) throw new AuthorizationError("Only the person this task is assigned to can withdraw it");
+  if (task.status !== "submitted") throw new ConflictError(`"${task.title}" isn't waiting for review`);
+
+  if (!(await updateDocIfStatus<Task>("tasks", taskId, "submitted", { status: "in-progress" } as Partial<Task>))) {
+    throw new ConflictError(`"${task.title}" was just reviewed — refresh to see it`);
+  }
+  await createActivityLog({
+    userId: actorUserId,
+    action: "task-updated",
+    description: `Withdrew submission for task "${task.title}"`,
+    entityType: "task",
+    entityId: taskId,
+    changes: { status: { oldValue: "submitted", newValue: "in-progress" } },
+  });
   return (await getTaskById(taskId))!;
 }
 
@@ -408,11 +445,12 @@ export async function reviewTask(
     reviewedAt: new Date(),
   };
   const status: TaskStatus = accepted ? "completed" : "changes-requested";
-  await updateDoc<Task>("tasks", taskId, {
+  const saved = await updateDocIfStatus<Task>("tasks", taskId, "submitted", {
     status,
     review,
     completedDate: accepted ? new Date() : null,
   } as unknown as Partial<Task>);
+  if (!saved) throw new ConflictError(`"${task.title}" was already reviewed or changed — refresh to see it`);
 
   await createActivityLog({
     userId: actorUserId,

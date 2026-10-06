@@ -32,7 +32,7 @@ function awardedLine(value: ApiCertificate["issuedAt"]) {
 }
 
 function bodyText(certificate: ApiCertificate) {
-  const event = `<strong>${escapeHtml(certificate.eventTitle)}</strong>`;
+  const activity = `<strong>${escapeHtml(certificate.eventTitle)}</strong>`;
   const date = longDate(certificate.eventDate);
   const where = [certificate.eventLocation && `Held In ${escapeHtml(certificate.eventLocation)}`, date && `On ${escapeHtml(date)}`]
     .filter(Boolean)
@@ -40,9 +40,9 @@ function bodyText(certificate: ApiCertificate) {
   const held = where ? `, ${where}` : "";
   if (certificate.kind === "organizer") {
     const as = certificate.recipientRole === "youth-leader" ? "As A Youth Leader Of" : "As Part Of";
-    return `For Successfully Leading And Organizing ${event}${held}, ${as} The Combine Foundation Youth Leadership Program, Demonstrating Initiative, Teamwork And Commitment To Serving The Community.`;
+    return `For Successfully Leading And Organizing ${activity}${held}, ${as} The Combine Foundation Youth Leadership Program, Demonstrating Initiative, Teamwork And Commitment To Serving The Community.`;
   }
-  return `For Actively Participating In ${event}${held}, As Part Of The Combine Foundation Youth Leadership Program, Demonstrating Commitment, Teamwork And Service To The Community.`;
+  return `For Actively Participating In ${activity}${held}, As Part Of The Combine Foundation Youth Leadership Program, Demonstrating Commitment, Teamwork And Service To The Community.`;
 }
 
 /** A gold "starburst" edge: `points` teeth between radius `outer` and `inner`, centred on (c, c). */

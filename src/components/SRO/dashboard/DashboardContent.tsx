@@ -30,7 +30,7 @@ export function DashboardContent() {
       {!isLoading && loadError && (
         <div role="alert" className="flex items-center gap-3 text-sm text-red-500">
           {loadError}
-          <button type="button" onClick={loadSummary} className="font-medium text-orange-500 hover:underline">
+          <button type="button" onClick={loadSummary} className="font-medium text-brand hover:underline">
             Retry
           </button>
         </div>
@@ -52,7 +52,7 @@ export function DashboardContent() {
           </div>
 
           <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-            <ActivitySummaryPanel activities={summary.activities} eventsHref="/SRO/activities" title="Team Activities" />
+            <ActivitySummaryPanel activities={summary.activities} activitiesHref="/SRO/activities" title="Team Activities" />
             <RecentNotifications notifications={summary.notifications} unreadCount={summary.unreadNotificationCount} />
           </div>
         </div>

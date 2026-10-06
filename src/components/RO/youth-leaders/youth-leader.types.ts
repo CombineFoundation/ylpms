@@ -17,4 +17,9 @@ export const addYouthLeaderFormSchema = z.object({
 /** An RO's youth leader request also carries the new youth leader's ID. */
 export const addYouthLeaderWithIdFormSchema = addYouthLeaderFormSchema.extend({ memberId: memberIdSchema });
 
-export type AddYouthLeaderForm = z.infer<typeof addYouthLeaderFormSchema> & { memberId?: string };
+/** A youth leader's volunteer request also says what the volunteer will do in the team. */
+export const addVolunteerFormSchema = addYouthLeaderFormSchema.extend({
+  teamRole: z.string().trim().min(2, "Team role must be at least 2 characters").max(60, "Keep the team role under 60 characters"),
+});
+
+export type AddYouthLeaderForm = z.infer<typeof addYouthLeaderFormSchema> & { memberId?: string; teamRole?: string };

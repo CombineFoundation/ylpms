@@ -4,10 +4,12 @@ import {
   AccountDisabledError,
   AuthenticationError,
   AuthorizationError,
+  CohortClosedError,
+  PasswordChangeRequiredError,
   handleError,
 } from "@/utils/errors";
 import { UserRole, UserStatus } from "@/types/user.types";
-import { cohortAccessError } from "@/services/cohort.service";
+import { cohortAccessFor } from "@/services/cohort.service";
 
 export interface AuthenticatedRequest extends NextRequest {
   user?: {
@@ -36,10 +38,17 @@ export function withAuth(
         .collection("users")
         .doc(decoded.uid)
         .get();
-      const profile = profileSnapshot.data() as { role?: UserRole; status?: UserStatus; cohortId?: string } | undefined;
+      const profile = profileSnapshot.data() as
+        | { role?: UserRole; status?: UserStatus; cohortId?: string; mustChangePassword?: boolean }
+        | undefined;
+      // No profile means the account was deleted (or never set up): a sign-in
+      // that outlived it mustn't keep working on the role in its token.
+      if (!profile) {
+        throw new AuthenticationError("This account no longer exists. Contact your administrator.");
+      }
       // The Firestore profile is the source of truth; custom claims can be stale
       // after a role change until the user's token refreshes.
-      const role = profile?.role || decoded.role;
+      const role = profile.role || decoded.role;
 
       if (!role) {
         throw new AuthenticationError("User profile is missing a role");
@@ -54,9 +63,14 @@ export function withAuth(
         );
       }
 
-      // Youth leaders and volunteers can only sign in while their cohort runs.
-      const cohortError = await cohortAccessError(role, profile?.cohortId);
-      if (cohortError) throw new AccountDisabledError(cohortError);
+      // Youth leaders and volunteers use the portal while their cohort runs; afterwards only their certificates.
+      const access = await cohortAccessFor(role, profile.cohortId);
+      if (access?.closed && !isOpenAfterCohort(req)) throw new CohortClosedError(access.message ?? undefined);
+
+      // A new account can only sign in and set its password until it replaces the temporary one.
+      if (profile.mustChangePassword && !req.nextUrl.pathname.startsWith("/api/auth/")) {
+        throw new PasswordChangeRequiredError();
+      }
 
       // Attach user info to request
       const authReq = req as AuthenticatedRequest;
@@ -83,6 +97,19 @@ export function withAuth(
 }
 
 const BLOCKED_STATUSES = new Set<UserStatus>(["inactive", "suspended"]);
+
+/** What a youth leader or volunteer can still reach once their cohort has ended: sign-in, their profile and certificates. */
+function isOpenAfterCohort(req: NextRequest) {
+  const path = req.nextUrl.pathname;
+  if (path.startsWith("/api/auth/")) return true;
+  if (req.method !== "GET") return false;
+  return (
+    path === "/api/users/me" ||
+    path === "/api/notifications/unread-count" ||
+    path === "/api/certificates" ||
+    (/^\/api\/certificates\/[^/]+$/.test(path) && path !== "/api/certificates/team")
+  );
+}
 
 /**
  * The Firebase Admin SDK throws its own error classes (not our AuthenticationError)

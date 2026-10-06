@@ -1,12 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
 import { AlertTriangle } from "lucide-react";
-import { EmailAuthProvider, reauthenticateWithCredential, updatePassword } from "firebase/auth";
-import { getFirebaseAuth } from "@/lib/firebase";
+import { changeOwnPassword, passwordChangeError, passwordSchema, type PasswordForm } from "@/lib/change-password";
 import { apiFetch, errorMessage, ApiError } from "@/lib/api-client";
 import { zodResolver, applyServerFieldErrors } from "@/lib/zod-resolver";
 import { useCurrentProfile, roleTitles } from "@/hooks/useCurrentProfile";
@@ -26,7 +24,7 @@ const preferenceLabels: Record<PreferenceKey, { label: string; hint: string }> =
   reportSubmissions: { label: "Report submissions", hint: "When someone submits a report for review" },
   newRegistrations: { label: "New user registrations", hint: "When someone is added to your team" },
   taskUpdates: { label: "Task updates", hint: "When a task you assigned is completed" },
-  eventReminders: { label: "New event alerts", hint: "When a new event is scheduled" },
+  eventReminders: { label: "New activity alerts", hint: "When a new activity is scheduled" },
 };
 
 /** Volunteers don't review reports, assign tasks or manage a team, so those toggles don't apply. */
@@ -44,19 +42,6 @@ const profileSchema = z.object({
 });
 type ProfileForm = z.infer<typeof profileSchema>;
 
-const passwordSchema = z
-  .object({
-    current: z.string().min(1, "Enter your current password"),
-    next: z
-      .string()
-      .min(8, "Use at least 8 characters")
-      .regex(/[A-Za-z]/, "Include at least one letter")
-      .regex(/[0-9]/, "Include at least one number"),
-    confirm: z.string(),
-  })
-  .refine((data) => data.next === data.confirm, { message: "Passwords don't match", path: ["confirm"] })
-  .refine((data) => data.next !== data.current, { message: "Choose a different password from your current one", path: ["next"] });
-type PasswordForm = z.infer<typeof passwordSchema>;
 
 const cardClass = "flex flex-col overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm";
 const fieldClass =
@@ -65,7 +50,6 @@ const primaryButton =
   "w-full rounded-lg bg-brand px-4 py-1.5 text-sm font-medium text-white transition hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-60";
 
 export function SettingsForm() {
-  const router = useRouter();
   const { profile, isLoading: isLoadingProfile, setProfile } = useCurrentProfile();
 
   const profileForm = useForm<ProfileForm>({
@@ -155,31 +139,14 @@ export function SettingsForm() {
     setPasswordError(null);
     setPasswordMessage(null);
 
-    const authUser = getFirebaseAuth().currentUser;
-    if (!authUser || !authUser.email) {
-      setPasswordError("Please sign in again.");
-      return;
-    }
-
     try {
-      const credential = EmailAuthProvider.credential(authUser.email, values.current);
-      await reauthenticateWithCredential(authUser, credential);
-      await updatePassword(authUser, values.next);
+      await changeOwnPassword(values.current, values.next);
       setPasswordMessage("Password updated.");
       passwordForm.reset();
     } catch (error) {
-      const code = (error as { code?: string } | null)?.code;
-      if (code === "auth/invalid-credential" || code === "auth/wrong-password") {
-        passwordForm.setError("current", { type: "server", message: "Current password is incorrect." });
-      } else if (code === "auth/weak-password") {
-        passwordForm.setError("next", { type: "server", message: "That password is too weak." });
-      } else if (code === "auth/too-many-requests") {
-        setPasswordError("Too many attempts. Please wait a few minutes and try again.");
-      } else if (code === "auth/requires-recent-login") {
-        setPasswordError("For security, please sign out and sign back in, then try again.");
-      } else {
-        setPasswordError("Unable to update password. Please try again.");
-      }
+      const problem = passwordChangeError(error);
+      if (problem.field) passwordForm.setError(problem.field, { type: "server", message: problem.message });
+      else setPasswordError(problem.message);
     }
   });
 
@@ -189,7 +156,7 @@ export function SettingsForm() {
     setDeactivateError(null);
     try {
       await apiFetch(`/api/users/${profile.id}`, { method: "PUT", body: { status: "inactive" } });
-      await signOutUser(router);
+      await signOutUser();
     } catch (error) {
       setDeactivateError(errorMessage(error, "Unable to deactivate your account."));
       setIsDeactivating(false);
@@ -218,7 +185,7 @@ export function SettingsForm() {
             {profile && (
               <>
                 <div className="mb-4 flex items-center gap-4">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-orange-100 text-lg font-semibold text-orange-700">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-orange-100 text-lg font-semibold text-brand-dark">
                     {getInitials(displayName)}
                   </div>
                   <div>

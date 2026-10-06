@@ -15,7 +15,7 @@ function Panel({ title, href, linkLabel, children }: { title: string; href: stri
     <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-semibold text-slate-700">{title}</h2>
-        <Link href={href} className="flex items-center gap-0.5 text-xs font-medium text-orange-500">
+        <Link href={href} className="flex items-center gap-0.5 text-xs font-medium text-brand">
           {linkLabel} <ChevronRight size={13} />
         </Link>
       </div>
@@ -45,7 +45,7 @@ function StatCards({ stats }: { stats: VolunteerDashboardSummary["stats"] }) {
       value: stats.upcomingActivities,
       sub: `${stats.activitiesAttended} attended so far`,
       icon: CalendarDays,
-      accent: "bg-orange-100 text-orange-500",
+      accent: "bg-orange-100 text-brand",
     },
     { label: "CERTIFICATES", value: stats.certificates, sub: "Earned so far", icon: Award, accent: "bg-amber-100 text-amber-500" },
   ];
@@ -95,7 +95,7 @@ export function DashboardContent() {
       {!isLoading && error && (
         <div role="alert" className="flex items-center gap-3 text-sm text-red-500">
           {error}
-          <button type="button" onClick={reload} className="font-medium text-orange-500 hover:underline">
+          <button type="button" onClick={reload} className="font-medium text-brand hover:underline">
             Retry
           </button>
         </div>
@@ -132,7 +132,7 @@ export function DashboardContent() {
               )}
               {summary.upcomingActivities.map((activity) => (
                 <div key={activity.id} className="flex items-start gap-3">
-                  <span className="mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-orange-50 text-orange-500">
+                  <span className="mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-orange-50 text-brand">
                     <CalendarDays size={14} />
                   </span>
                   <div className="min-w-0">

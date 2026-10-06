@@ -15,6 +15,7 @@ export interface Certificate {
   recipientRole: UserRole;
   kind: CertificateKind;
   title: string;
+  /** The activity's id, title, location and date. Stored under these "event" field names, which existing certificates use. */
   eventId: string;
   eventTitle: string;
   eventLocation: string;

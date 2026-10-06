@@ -1,12 +1,13 @@
-import { createDoc, deleteDocFromFirestore, getDocById, queryDocs, updateDoc } from "@/utils/firestore";
+import { createDoc, deleteDocFromFirestore, getDocById, queryDocs, updateDoc, updateDocAtomically } from "@/utils/firestore";
 import { toDate } from "@/utils/aggregation";
 import { isInManagerChain } from "@/utils/authorization";
 import { AuthorizationError, ConflictError, NotFoundError, ValidationError, logger } from "@/utils/errors";
 import { createActivityLog } from "./activitylog.service";
 import { notifyUsers } from "./notification.service";
-import { createUser, getUserById, requireMemberIdAvailable } from "./user.service";
+import { createUser, getUserById, getUsersReportingTo, requireMemberIdAvailable } from "./user.service";
 import { normalizeMemberId } from "@/utils/member-id";
-import type { UserRole } from "@/types/user.types";
+import { chunk, getMemberProfiles } from "./team.service";
+import type { MemberProfile, UserRole } from "@/types/user.types";
 import type {
   CreateMemberRequest,
   MemberRequest,
@@ -103,7 +104,7 @@ export async function createMemberRequest(
       throw new ConflictError(`A request for ${email} is already awaiting approval`);
     }
     const memberId = data.memberId ? normalizeMemberId(data.memberId) : undefined;
-    if (memberId) await requireIdNotRequested(rule, memberId);
+    if (memberId) await requireIdNotRequested(memberId);
 
     const requestId = crypto.randomUUID();
     const stored = await createDoc<StoredRequest>(rule.collection, requestId, {
@@ -113,6 +114,7 @@ export async function createMemberRequest(
       phone: data.phone || undefined,
       region: data.region || undefined,
       university: data.university || undefined,
+      teamRole: data.teamRole?.trim() || undefined,
       memberId,
       requestedBy: requesterId,
       requestedByName: requester.name,
@@ -148,11 +150,18 @@ export async function createMemberRequest(
   }
 }
 
-/** The ID must be free, and not already claimed by another request awaiting approval. */
-async function requireIdNotRequested(rule: RequestRule, memberId: string) {
+/**
+ * The ID must be free, and not already claimed by a youth leader or volunteer
+ * request awaiting approval (other than `exceptRequestId`, the one being approved).
+ */
+export async function requireIdNotRequested(memberId: string, exceptRequestId?: string) {
   await requireMemberIdAvailable(memberId);
-  const claimed = await queryDocs<StoredRequest>(rule.collection, [{ field: "memberId", operator: "==", value: memberId }]);
-  if (claimed.some((request) => request.status === "pending")) {
+  const claimed = await Promise.all(
+    Object.values(RULES).map((rule) =>
+      queryDocs<StoredRequest>(rule.collection, [{ field: "memberId", operator: "==", value: memberId }])
+    )
+  );
+  if (claimed.flat().some((request) => request.status === "pending" && request.id !== exceptRequestId)) {
     throw new ConflictError(`ID ${memberId} is already used in a request awaiting approval`);
   }
 }
@@ -165,15 +174,74 @@ export async function getRequestsByRequester(role: MemberRequestRole, requesterI
   return requests.map((request) => normalize(role, request)).sort(newestFirst);
 }
 
-/** Requests awaiting (or decided by) the approver, pending first. */
-export async function getRequestsForApprover(role: MemberRequestRole, approverId: string): Promise<MemberRequest[]> {
+/** Requests awaiting (or decided by) the approver, pending first, with each requester's profile. */
+export async function getRequestsForApprover(
+  role: MemberRequestRole,
+  approverId: string
+): Promise<(MemberRequest & { requesterProfile?: MemberProfile })[]> {
   const rule = RULES[role];
-  const requests = await queryDocs<StoredRequest>(rule.collection, [
-    { field: rule.approverField, operator: "==", value: approverId },
+  // Pending requests go to whoever the requester reports to now (they may have moved since asking);
+  // decided ones stay with whoever decided them.
+  const reportIds = (await getUsersReportingTo(approverId))
+    .filter((user) => user.role === rule.requesterRole)
+    .map((user) => user.id);
+  const [stored, ...fromReports] = await Promise.all([
+    queryDocs<StoredRequest>(rule.collection, [{ field: rule.approverField, operator: "==", value: approverId }]),
+    ...chunk(reportIds).map((ids) =>
+      queryDocs<StoredRequest>(rule.collection, [
+        { field: "requestedBy", operator: "in", value: ids },
+      ])
+    ),
   ]);
+  const current = new Set(reportIds);
+  const byId = new Map<string, StoredRequest>();
+  stored
+    .filter((request) => request.status !== "pending" || current.has(request.requestedBy))
+    .concat(fromReports.flat().filter((request) => request.status === "pending"))
+    .forEach((request) => byId.set(request.id, request));
+  const requests = [...byId.values()];
+  const profiles = await getMemberProfiles(requests.map((request) => request.requestedBy));
   return requests
-    .map((request) => normalize(role, request))
+    .map((request) => ({ ...normalize(role, request), requesterProfile: profiles.get(request.requestedBy) }))
     .sort((a, b) => Number(b.status === "pending") - Number(a.status === "pending") || newestFirst(a, b));
+}
+
+/**
+ * After people move to a new manager, their pending requests go to that
+ * manager, who is told. Called wherever a manager is changed.
+ */
+export async function reassignPendingRequests(requesterIds: string[], newApproverId: string | null): Promise<void> {
+  if (!newApproverId || requesterIds.length === 0) return;
+  try {
+    for (const [role, rule] of Object.entries(RULES) as [MemberRequestRole, RequestRule][]) {
+      const pending = (
+        await Promise.all(
+          chunk(requesterIds).map((ids) =>
+            queryDocs<StoredRequest>(rule.collection, [
+              { field: "requestedBy", operator: "in", value: ids },
+            ])
+          )
+        )
+      )
+        .flat()
+        .filter((request) => request.status === "pending" && normalize(role, request).approverId !== newApproverId);
+      for (const request of pending) {
+        await updateDoc(rule.collection, request.id, { [rule.approverField]: newApproverId });
+      }
+      if (pending.length > 0) {
+        await notifyUsers([newApproverId], {
+          type: "user-added",
+          title: `${pending.length} ${rule.label} request${pending.length === 1 ? "" : "s"} now awaiting your approval`,
+          message: "Sent by someone who now reports to you.",
+          relatedType: "user",
+          actionUrl: rule.approverRoute,
+        });
+      }
+    }
+  } catch (error) {
+    // The approver's list already follows the current manager, so this only affects the stored id and the notice.
+    logger.error(`Failed to move pending requests to ${newApproverId}`, error);
+  }
 }
 
 /** Developers can act for anyone; otherwise the reviewer must be the approver role above the requester. */
@@ -183,6 +251,25 @@ async function requireCanReview(role: MemberRequestRole, caller: Caller, request
   if (caller.role !== rule.approverRole || !(await isInManagerChain(caller.userId, request.requestedBy))) {
     throw new AuthorizationError(`Only the requester's ${rule.approverTitle} can review this request`);
   }
+}
+
+/** How long a review in progress blocks others; a crashed review frees the request after this. */
+const REVIEW_CLAIM_MS = 2 * 60 * 1000;
+
+/**
+ * Marks a pending request as being reviewed, in a transaction, so two reviewers
+ * (or a double click) can't decide it at the same time — approving creates an
+ * account and emails sign-in details, which can't be undone cleanly.
+ */
+async function claimForReview(collection: string, requestId: string): Promise<void> {
+  await updateDocAtomically<MemberRequest & { reviewStartedAt?: unknown }>(collection, requestId, (current) => {
+    if (current.status !== "pending") throw new ConflictError(`This request was already ${current.status}`);
+    const started = toDate(current.reviewStartedAt as Date | undefined);
+    if (started && Date.now() - started.getTime() < REVIEW_CLAIM_MS) {
+      throw new ConflictError("Someone is already reviewing this request — refresh in a moment");
+    }
+    return { reviewStartedAt: new Date() };
+  });
 }
 
 export async function reviewMemberRequest(
@@ -201,13 +288,18 @@ export async function reviewMemberRequest(
     if (request.status !== "pending") throw new ConflictError(`This request was already ${request.status}`);
 
     const reviewer = await getUserById(caller.userId);
+    const assignedId = decision === "approved" ? request.memberId || (memberId && normalizeMemberId(memberId)) : undefined;
+    if (decision === "approved" && !assignedId) {
+      throw new ValidationError(`Enter the new ${rule.label}'s ID to approve this request`);
+    }
+    if (assignedId) await requireIdNotRequested(assignedId, requestId);
+
+    await claimForReview(rule.collection, requestId);
 
     // Create the account first: if it fails (e.g. the email got taken), the
-    // request stays pending so the approver can retry or reject it.
+    // request is released and stays pending so the approver can retry or reject it.
     let createdUserId: string | undefined;
-    const assignedId = decision === "approved" ? request.memberId || (memberId && normalizeMemberId(memberId)) : undefined;
     if (decision === "approved") {
-      if (!assignedId) throw new ValidationError(`Enter the new ${rule.label}'s ID to approve this request`);
       const user = await createUser(
         {
           email: request.email,
@@ -215,16 +307,21 @@ export async function reviewMemberRequest(
           phone: request.phone,
           region: request.region,
           university: request.university,
+          teamRole: request.teamRole,
           role,
           parentId: request.requestedBy,
           memberId: assignedId,
         },
         caller.userId
-      );
+      ).catch(async (error) => {
+        await updateDoc(rule.collection, requestId, { reviewStartedAt: null });
+        throw error;
+      });
       createdUserId = user.id;
     }
 
     const changes = {
+      reviewStartedAt: null,
       status: decision,
       reviewedBy: caller.userId,
       reviewedByName: reviewer?.name || "Unknown",
@@ -274,6 +371,7 @@ export async function withdrawMemberRequest(role: MemberRequestRole, requestId: 
   }
   if (request.status !== "pending") throw new ConflictError(`This request was already ${request.status}`);
 
+  await claimForReview(rule.collection, requestId); // not while it's being approved
   await deleteDocFromFirestore(rule.collection, requestId);
   await createActivityLog({
     userId: caller.userId,

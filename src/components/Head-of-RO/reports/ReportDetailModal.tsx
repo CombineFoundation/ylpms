@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Modal } from "@/components/ui/Modal";
+import { MemberProfileCard, nameWithRole } from "@/components/shared/MemberProfileCard";
 import { apiFetch, errorMessage } from "@/lib/api-client";
 import { ReportAttachments } from "./ReportAttachments";
 import {
@@ -52,7 +53,8 @@ export function ReportDetailModal({ reportId, onClose, onReview }: ReportDetailM
             </span>
             <span className="rounded-full bg-gray-100 px-2.5 py-1">{reportTypeLabels[report.type] || report.type}</span>
             <span>
-              By <span className="font-medium text-gray-700">{report.submittedByName}</span> · {report.submittedByRegion}
+              By <span className="font-medium text-gray-700">{nameWithRole(report.submittedByName ?? "Unknown", report.submittedByRole)}</span> ·{" "}
+              {report.submittedByRegion}
             </span>
             <span>· Submitted {formatReportDate(report.createdAt)}</span>
             {report.period && (
@@ -61,6 +63,8 @@ export function ReportDetailModal({ reportId, onClose, onReview }: ReportDetailM
               </span>
             )}
           </div>
+
+          {onReview && report.submitterProfile && <MemberProfileCard title="Submitted by" profile={report.submitterProfile} />}
 
           <section>
             <h3 className="mb-1 font-semibold text-gray-800">Summary</h3>
@@ -106,6 +110,13 @@ export function ReportDetailModal({ reportId, onClose, onReview }: ReportDetailM
             <section className="rounded-lg border border-gray-100 bg-gray-50 p-3">
               <h3 className="mb-1 text-xs font-semibold text-gray-500">Reviewer comment</h3>
               <p className="text-gray-700">{report.reviewComment}</p>
+            </section>
+          )}
+
+          {report.previousReviewComment && !report.reviewComment && (
+            <section className="rounded-lg border border-amber-100 bg-amber-50 p-3">
+              <h3 className="mb-1 text-xs font-semibold text-amber-700">Resubmitted after this feedback</h3>
+              <p className="whitespace-pre-line text-gray-700">{report.previousReviewComment}</p>
             </section>
           )}
 

@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { Plus, FileText, CalendarDays } from "lucide-react";
 import { useCurrentProfile } from "@/hooks/useCurrentProfile";
+import { formatDate } from "@/utils/format-date";
 
 export function WelcomeBanner() {
   const { profile } = useCurrentProfile();
   const firstName = profile?.name?.split(" ")[0];
-  const today = new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  const today = formatDate(new Date());
 
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -23,7 +24,7 @@ export function WelcomeBanner() {
         <span className="text-xs text-slate-400 hidden sm:block">{today}</span>
         <Link
           href="/SRO/tasks?new=1"
-          className="flex items-center gap-1.5 rounded-lg bg-orange-500 px-4 py-2 text-sm font-medium text-white hover:bg-orange-600"
+          className="flex items-center gap-1.5 rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-dark"
         >
           <Plus size={15} />
           Assign Task

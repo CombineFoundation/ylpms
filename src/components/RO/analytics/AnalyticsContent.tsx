@@ -46,7 +46,7 @@ export function AnalyticsContent() {
 
   const cards = data
     ? [
-        { label: "Youth Leaders", value: data.stats.leads, sub: "Reporting to you", icon: Heart, color: "bg-orange-100 text-orange-500" },
+        { label: "Youth Leaders", value: data.stats.leads, sub: "Reporting to you", icon: Heart, color: "bg-orange-100 text-brand" },
         { label: "Volunteers", value: data.stats.volunteers, sub: "Across your team", icon: HandHelping, color: "bg-blue-100 text-blue-500" },
         {
           label: "Task completion",
@@ -82,7 +82,7 @@ export function AnalyticsContent() {
       {!summary.isLoading && summary.error && (
         <p role="alert" className="text-sm text-red-500">
           {summary.error}{" "}
-          <button type="button" onClick={summary.reload} className="font-medium text-orange-500 hover:underline">
+          <button type="button" onClick={summary.reload} className="font-medium text-brand hover:underline">
             Retry
           </button>
         </p>

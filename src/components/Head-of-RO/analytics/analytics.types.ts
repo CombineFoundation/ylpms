@@ -8,12 +8,12 @@ export type AnalyticsSummary = {
   months: number;
   stats: {
     totalUsers: StatWithDelta;
-    eventsThisMonth: StatWithDelta;
+    activitiesThisMonth: StatWithDelta;
     reportsFiled: StatWithDelta;
     tasksCompleted: StatWithDelta;
   };
   userGrowth: { month: string; value: number }[];
-  eventsPerMonth: { month: string; value: number }[];
+  activitiesPerMonth: { month: string; value: number }[];
   volunteersByRegion: { name: string; value: number; color: string }[];
 };
 

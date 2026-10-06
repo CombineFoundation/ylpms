@@ -4,15 +4,15 @@ import type { ActivitySummary } from "@/components/SRO/dashboard/dashboard.types
 
 type ActivitySummaryPanelProps = {
   activities: ActivitySummary;
-  /** The portal's events page, e.g. "/RO/activities". */
-  eventsHref: string;
+  /** The portal's activities page, e.g. "/RO/activities". */
+  activitiesHref: string;
   /** Hide the review tiles for someone who doesn't review activities (a youth leader). */
   showReview?: boolean;
   title?: string;
 };
 
 /** Activities awaiting the viewer's approval / verification, and what's coming up. */
-export function ActivitySummaryPanel({ activities, eventsHref, showReview = true, title = "Activities" }: ActivitySummaryPanelProps) {
+export function ActivitySummaryPanel({ activities, activitiesHref, showReview = true, title = "Activities" }: ActivitySummaryPanelProps) {
   const toReview = activities.awaitingApproval + activities.awaitingVerification;
   const tiles = [
     ...(showReview
@@ -36,12 +36,12 @@ export function ActivitySummaryPanel({ activities, eventsHref, showReview = true
         <h2 className="text-sm font-semibold text-slate-700">
           {title}
           {showReview && toReview > 0 && (
-            <span className="ml-2 rounded-full bg-orange-500 px-2 py-0.5 text-[11px] font-semibold text-white">
+            <span className="ml-2 rounded-full bg-brand px-2 py-0.5 text-[11px] font-semibold text-white">
               {toReview} need{toReview === 1 ? "s" : ""} you
             </span>
           )}
         </h2>
-        <Link href={eventsHref} className="flex items-center gap-0.5 text-xs font-medium text-orange-500">
+        <Link href={activitiesHref} className="flex items-center gap-0.5 text-xs font-medium text-brand">
           Open <ChevronRight size={13} />
         </Link>
       </div>
@@ -63,7 +63,7 @@ export function ActivitySummaryPanel({ activities, eventsHref, showReview = true
             {activities.reviewQueue.map((item) => (
               <li key={item.id}>
                 <Link
-                  href={eventsHref}
+                  href={activitiesHref}
                   className="flex items-center justify-between gap-3 rounded-xl bg-orange-50/60 px-3 py-2 text-sm hover:bg-orange-50"
                 >
                   <span className="min-w-0">
@@ -72,7 +72,7 @@ export function ActivitySummaryPanel({ activities, eventsHref, showReview = true
                       {item.organizerName} · {item.date}
                     </span>
                   </span>
-                  <span className="shrink-0 text-xs font-semibold text-orange-600">
+                  <span className="shrink-0 text-xs font-semibold text-brand-dark">
                     {item.status === "submitted" ? "Approve" : "Verify"}
                   </span>
                 </Link>
@@ -84,18 +84,18 @@ export function ActivitySummaryPanel({ activities, eventsHref, showReview = true
 
       <div className="mt-5">
         <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Coming up</p>
-        {activities.upcomingEvents.length === 0 ? (
+        {activities.upcomingActivities.length === 0 ? (
           <p className="mt-2 text-xs text-slate-400">No upcoming activities.</p>
         ) : (
           <ul className="mt-2 flex flex-col gap-2">
-            {activities.upcomingEvents.map((event) => (
-              <li key={event.id} className="flex items-start gap-2">
+            {activities.upcomingActivities.map((activity) => (
+              <li key={activity.id} className="flex items-start gap-2">
                 <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-blue-400" />
                 <div className="min-w-0">
-                  <p className="truncate text-sm text-slate-700">{event.title}</p>
+                  <p className="truncate text-sm text-slate-700">{activity.title}</p>
                   <p className="text-xs text-slate-400">
-                    {event.date}
-                    {event.location ? ` · ${event.location}` : ""} · {event.organizerName}
+                    {activity.date}
+                    {activity.location ? ` · ${activity.location}` : ""} · {activity.organizerName}
                   </p>
                 </div>
               </li>

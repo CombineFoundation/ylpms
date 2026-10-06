@@ -17,10 +17,10 @@ export function RecentNotifications({ notifications, unreadCount, basePath = "/S
         <h2 className="flex items-center gap-2 text-sm font-semibold text-slate-700">
           Recent Notifications
           {unreadCount > 0 && (
-            <span className="rounded-full bg-orange-500 px-2 py-0.5 text-[11px] font-semibold text-white">{unreadCount} new</span>
+            <span className="rounded-full bg-brand px-2 py-0.5 text-[11px] font-semibold text-white">{unreadCount} new</span>
           )}
         </h2>
-        <Link href={`${basePath}/notifications`} className="text-xs font-medium text-orange-500">
+        <Link href={`${basePath}/notifications`} className="text-xs font-medium text-brand">
           View all
         </Link>
       </div>

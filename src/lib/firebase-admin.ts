@@ -29,7 +29,7 @@ export function getFirebaseAdminDb() {
   return getFirestore(getAdminApp());
 }
 
-/** Default Storage bucket. Browser access is denied by storage.rules; files go through the API. */
+/** Default Storage bucket. storage.rules deny browser access; files move through signed URLs (direct-upload.service.ts). */
 export function getFirebaseAdminBucket() {
   const bucket = process.env.FIREBASE_STORAGE_BUCKET || process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
   if (!bucket) throw new Error("Firebase Storage bucket is not configured (FIREBASE_STORAGE_BUCKET).");

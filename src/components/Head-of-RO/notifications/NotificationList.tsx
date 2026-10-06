@@ -81,7 +81,7 @@ export function NotificationList({ portalPrefix }: { portalPrefix?: string } = {
             <button
               type="button"
               onClick={markAllAsRead}
-              className="rounded-lg bg-orange-50 px-4 py-2 text-sm font-medium text-orange-600 transition hover:text-orange-700"
+              className="rounded-lg bg-orange-50 px-4 py-2 text-sm font-medium text-brand-dark transition hover:text-brand-dark"
             >
               Mark all as read
             </button>

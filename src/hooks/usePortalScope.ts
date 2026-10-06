@@ -80,7 +80,7 @@ const stores: Record<ScopedRole, UseBoundStore<StoreApi<ScopeStore>>> = {
  * `?youthLeaderId=` / `?volunteerId=`.
  */
 export function usePortalScope(role: ScopedRole) {
-  const { profile } = useCurrentProfile();
+  const { profile, hasError: profileFailed, reload: reloadProfile } = useCurrentProfile();
   const store = stores[role]();
   const isDeveloper = profile?.role === "developer";
 
@@ -100,9 +100,13 @@ export function usePortalScope(role: ScopedRole) {
     ownerId: selectedId ?? profile?.id ?? null,
     options: store.options,
     select: store.select,
-    error: isDeveloper ? store.error : null,
+    error: profileFailed ? PROFILE_ERROR : isDeveloper ? store.error : null,
+    /** Retry loading the signed-in profile after it failed. */
+    reloadProfile,
   };
 }
+
+const PROFILE_ERROR = "Couldn't load your account. Check your connection and try again.";
 
 export function scopedPath(path: string, role: ScopedRole, selectedId: string | null) {
   if (!selectedId) return path;
@@ -114,7 +118,7 @@ export function scopedPath(path: string, role: ScopedRole, selectedId: string | 
  * switches whose team they're viewing. Stale responses are ignored.
  */
 export function usePortalData<T>(role: ScopedRole, path: string, errorFallback: string) {
-  const { isReady, selectedId, error: scopeError } = usePortalScope(role);
+  const { isReady, selectedId, error: scopeError, reloadProfile } = usePortalScope(role);
   const [data, setData] = useState<T | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -125,6 +129,8 @@ export function usePortalData<T>(role: ScopedRole, path: string, errorFallback: 
     if (scopeError) {
       setError(scopeError);
       setIsLoading(false);
+      // Retrying a page whose profile failed retries the profile; this reruns once it loads.
+      if (scopeError === PROFILE_ERROR) reloadProfile();
       return;
     }
     if (!isReady) return;
@@ -138,7 +144,7 @@ export function usePortalData<T>(role: ScopedRole, path: string, errorFallback: 
     } finally {
       if (id === requestId.current) setIsLoading(false);
     }
-  }, [role, path, errorFallback, isReady, selectedId, scopeError]);
+  }, [role, path, errorFallback, isReady, selectedId, scopeError, reloadProfile]);
 
   useEffect(() => {
     reload();

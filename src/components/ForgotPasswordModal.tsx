@@ -84,15 +84,15 @@ export default function ForgotPasswordModal({
             <button
               type="button"
               onClick={onClose}
-              className="mt-7 w-full rounded-full bg-[#E8622C] py-3 text-sm font-semibold text-white hover:bg-[#d9551f]"
+              className="mt-7 w-full rounded-full bg-brand py-3 text-sm font-semibold text-white hover:bg-brand-dark"
             >
               Done
             </button>
           </div>
         ) : (
           <>
-            <div className="mb-6 flex h-11 w-11 items-center justify-center rounded-full bg-[#E8622C]/10">
-              <Mail className="h-5 w-5 text-[#E8622C]" />
+            <div className="mb-6 flex h-11 w-11 items-center justify-center rounded-full bg-brand/10">
+              <Mail className="h-5 w-5 text-brand" />
             </div>
             <h3 id="reset-password-title" className="text-lg font-bold text-gray-900">
               Reset your password
@@ -115,7 +115,7 @@ export default function ForgotPasswordModal({
                     value={email}
                     onChange={(event) => setEmail(event.target.value)}
                     placeholder="name@university.edu"
-                    className="w-full rounded-md border border-gray-200 bg-white py-2.5 pl-10 pr-3 text-sm text-gray-900 placeholder:text-gray-400 focus:border-[#E8622C] focus:outline-none focus:ring-2 focus:ring-[#E8622C]/40"
+                    className="w-full rounded-md border border-gray-200 bg-white py-2.5 pl-10 pr-3 text-sm text-gray-900 placeholder:text-gray-400 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/40"
                   />
                 </div>
               </div>
@@ -125,7 +125,7 @@ export default function ForgotPasswordModal({
               <button
                 type="submit"
                 disabled={isSending}
-                className="w-full rounded-full bg-[#E8622C] py-3 text-sm font-semibold text-white transition-colors hover:bg-[#d9551f] disabled:cursor-not-allowed disabled:bg-gray-300"
+                className="w-full rounded-full bg-brand py-3 text-sm font-semibold text-white transition-colors hover:bg-brand-dark disabled:cursor-not-allowed disabled:bg-gray-300"
               >
                 {isSending ? "Sending..." : "Send reset link"}
               </button>

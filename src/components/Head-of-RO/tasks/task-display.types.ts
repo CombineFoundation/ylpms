@@ -4,6 +4,7 @@ import type { ReportAttachment } from "@/types/report.types";
 import type { UserRole } from "@/types/user.types";
 import type { TimestampInput } from "@/utils/user-status";
 import { timestampToDate } from "@/utils/user-status";
+import { formatDate } from "@/utils/format-date";
 
 /** A task as returned by GET /api/tasks (assignee name resolved server-side). */
 export type ApiTask = {
@@ -21,6 +22,8 @@ export type ApiTask = {
   /** The activity this task is for, if the assigner linked one. */
   eventId?: string;
   eventTitle?: string;
+  /** Set on monthly tasks, which the youth leader's RO owns and reviews (Head RO only views them). */
+  monthlyCycle?: string;
 };
 
 /** What the assignee handed in (timestamps serialized). */
@@ -52,6 +55,8 @@ export type TaskRow = {
   review?: ApiTaskReview;
   eventId?: string;
   eventTitle?: string;
+  /** Monthly tasks are view-only here: the youth leader's RO manages and reviews them. */
+  isMonthly: boolean;
 };
 
 export function toTaskRow(task: ApiTask): TaskRow {
@@ -70,6 +75,7 @@ export function toTaskRow(task: ApiTask): TaskRow {
     review: task.review,
     eventId: task.eventId,
     eventTitle: task.eventTitle,
+    isMonthly: !!task.monthlyCycle,
   };
 }
 
@@ -88,7 +94,7 @@ export const priorityStyles: Record<TaskPriority, string> = {
 };
 
 export const statusLabels: Record<TaskStatus, string> = {
-  assigned: "Assigned",
+  assigned: "Pending",
   "in-progress": "In Progress",
   submitted: "In Review",
   "changes-requested": "Changes Requested",
@@ -101,7 +107,7 @@ export const statusStyles: Record<TaskStatus, string> = {
   assigned: "bg-amber-100 text-amber-600",
   "in-progress": "bg-blue-100 text-blue-600",
   submitted: "bg-violet-100 text-violet-600",
-  "changes-requested": "bg-orange-100 text-orange-600",
+  "changes-requested": "bg-orange-100 text-brand-dark",
   completed: "bg-emerald-100 text-emerald-600",
   overdue: "bg-red-100 text-red-500",
   cancelled: "bg-gray-100 text-gray-400",
@@ -113,7 +119,7 @@ export const TASK_STATUS_FILTERS = [
   { value: "submitted", label: "In Review" },
   { value: "changes-requested", label: "Changes Requested" },
   { value: "overdue", label: "Overdue" },
-  { value: "assigned", label: "Assigned" },
+  { value: "assigned", label: "Pending" },
   { value: "in-progress", label: "In Progress" },
   { value: "completed", label: "Done" },
   { value: "cancelled", label: "Cancelled" },
@@ -122,8 +128,7 @@ export const TASK_STATUS_FILTERS = [
 export type TaskStatusFilter = (typeof TASK_STATUS_FILTERS)[number]["value"];
 
 export function formatDueDate(value?: TimestampInput): string {
-  const date = timestampToDate(value);
-  return date ? date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "-";
+  return formatDate(timestampToDate(value));
 }
 
 /** YYYY-MM-DD in the user's local timezone (not UTC, which can shift the day). */

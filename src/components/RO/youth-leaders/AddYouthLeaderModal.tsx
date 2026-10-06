@@ -6,7 +6,12 @@ import { Modal } from "@/components/ui/Modal";
 import { CitySelect, UniversitySelect } from "@/components/shared/PlaceSelects";
 import { zodResolver } from "@/lib/zod-resolver";
 import { FieldError, inputClass } from "@/components/Head-of-RO/shared/ListParts";
-import { addYouthLeaderFormSchema, addYouthLeaderWithIdFormSchema, type AddYouthLeaderForm } from "./youth-leader.types";
+import {
+  addVolunteerFormSchema,
+  addYouthLeaderFormSchema,
+  addYouthLeaderWithIdFormSchema,
+  type AddYouthLeaderForm,
+} from "./youth-leader.types";
 
 type AddYouthLeaderModalProps = {
   isOpen: boolean;
@@ -18,9 +23,11 @@ type AddYouthLeaderModalProps = {
   approver?: string;
   /** Ask for the new member's ID (youth leaders; a volunteer's ID is entered by the approving RO). */
   askForId?: boolean;
+  /** Ask for the volunteer's role in the team (youth leaders requesting volunteers). */
+  askForTeamRole?: boolean;
 };
 
-const EMPTY_FORM: AddYouthLeaderForm = { name: "", email: "", phone: "", region: "", university: "", memberId: "" };
+const EMPTY_FORM: AddYouthLeaderForm = { name: "", email: "", phone: "", region: "", university: "", memberId: "", teamRole: "" };
 
 /** Submits a request to the requester's manager; the account is only created once they approve. */
 export function AddYouthLeaderModal({
@@ -31,6 +38,7 @@ export function AddYouthLeaderModal({
   title = "Add Youth Leader",
   approver = "SRO",
   askForId = false,
+  askForTeamRole = false,
 }: AddYouthLeaderModalProps) {
   const {
     register,
@@ -39,7 +47,9 @@ export function AddYouthLeaderModal({
     reset,
     formState: { errors, isSubmitting },
   } = useForm<AddYouthLeaderForm>({
-    resolver: zodResolver(askForId ? addYouthLeaderWithIdFormSchema : addYouthLeaderFormSchema),
+    resolver: zodResolver(
+      askForId ? addYouthLeaderWithIdFormSchema : askForTeamRole ? addVolunteerFormSchema : addYouthLeaderFormSchema
+    ),
     defaultValues: EMPTY_FORM,
   });
 
@@ -71,6 +81,18 @@ export function AddYouthLeaderModal({
               aria-invalid={!!errors.memberId}
             />
             <FieldError message={errors.memberId?.message} />
+          </label>
+        )}
+        {askForTeamRole && (
+          <label className="block text-sm font-medium text-gray-700">
+            Team role
+            <input
+              {...register("teamRole")}
+              placeholder="e.g. Media, Logistics, Coordinator"
+              className={inputClass}
+              aria-invalid={!!errors.teamRole}
+            />
+            <FieldError message={errors.teamRole?.message} />
           </label>
         )}
         <label className="block text-sm font-medium text-gray-700">

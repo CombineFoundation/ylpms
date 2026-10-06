@@ -62,12 +62,8 @@ export async function sendOtpEmail(to: string, code: string) {
   });
 }
 
-export async function sendUserCredentialsEmail(
-  to: string,
-  name: string,
-  password: string,
-  role: string
-) {
+/** Throws a clear error when SMTP isn't configured or rejects our credentials. */
+async function requireMailer() {
   if (!process.env.SMTP_HOST || !smtpUser || !smtpPassword) {
     throw new Error("Email service is not configured. Set SMTP_HOST, SMTP_USER, and SMTP_PASSWORD.");
   }
@@ -82,6 +78,53 @@ export async function sendUserCredentialsEmail(
     }
     throw error;
   }
+}
+
+/** Head RO re-sends sign-in help: a Firebase link where the user sets a new password. */
+export async function sendPasswordResetLinkEmail(to: string, name: string, resetLink: string) {
+  await requireMailer();
+  const loginUrl = `${getAppUrl()}/login`;
+
+  await transporter.sendMail({
+    from: `"Youth Leadership Program" <${getSenderAddress()}>`,
+    to,
+    subject: "Set your Youth Leadership Program password",
+    text: [
+      `Hello ${name},`,
+      "Use this link to set a new password for your account:",
+      resetLink,
+      `Then sign in at ${loginUrl} with ${to} and your new password.`,
+      "The link expires after a while. If it has, ask your administrator to send a new one.",
+    ].join("\n\n"),
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 520px; margin: 0 auto; padding: 24px; color: #333;">
+        <h2 style="color:#E8622C; margin-bottom: 8px;">Set your password</h2>
+        <p>Hello ${escapeHtml(name)},</p>
+        <p>Use the button below to set a new password for your Youth Leadership Program account.</p>
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:24px 0;">
+          <tr>
+            <td style="border-radius:6px; background:#E8622C;">
+              <a href="${escapeHtml(resetLink)}" target="_blank" rel="noopener"
+                style="display:inline-block; padding:12px 28px; font-size:15px; font-weight:600; color:#ffffff; text-decoration:none; border-radius:6px;">
+                Set my password
+              </a>
+            </td>
+          </tr>
+        </table>
+        <p>Then sign in at <a href="${loginUrl}" style="color:#E8622C;">${loginUrl}</a> with ${escapeHtml(to)} and your new password.</p>
+        <p style="font-size:12px; color:#888;">The link expires after a while. If it has, ask your administrator to send a new one.</p>
+      </div>
+    `,
+  });
+}
+
+export async function sendUserCredentialsEmail(
+  to: string,
+  name: string,
+  password: string,
+  role: string
+) {
+  await requireMailer();
 
   const loginUrl = `${getAppUrl()}/login`;
 
@@ -95,7 +138,7 @@ export async function sendUserCredentialsEmail(
       `Email: ${to}`,
       `Temporary password: ${password}`,
       `Log in: ${loginUrl}`,
-      "Please change your password after your first sign-in and do not share these credentials.",
+      "You will be asked to set your own password when you first sign in. Do not share these credentials.",
     ].join("\n\n"),
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 520px; margin: 0 auto; padding: 24px; color: #333;">
@@ -120,7 +163,7 @@ export async function sendUserCredentialsEmail(
           If the button doesn't work, copy this link into your browser:<br />
           <a href="${loginUrl}" style="color:#E8622C;">${loginUrl}</a>
         </p>
-        <p>Please change your password after your first sign-in and do not share these credentials.</p>
+        <p>You will be asked to set your own password when you first sign in. Do not share these credentials.</p>
       </div>
     `,
   });

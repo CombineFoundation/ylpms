@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Eye, Paperclip } from "lucide-react";
+import { Eye, Paperclip, RotateCcw } from "lucide-react";
 import { TableMessageRow } from "@/components/Head-of-RO/shared/ListParts";
 import { ReportDetailModal } from "@/components/Head-of-RO/reports/ReportDetailModal";
 import {
@@ -27,10 +27,12 @@ type MyReportsProps = {
   error: string | null;
   /** Who reviews these reports, e.g. "Head RO" (for an SRO) or "SRO" (for an RO). */
   reviewer?: string;
+  /** Opens a returned report to edit and resubmit it. */
+  onResubmit?: (report: ApiReport) => void;
 };
 
 /** Reports the manager submitted to their reviewer, with review status and feedback. */
-export function MyReports({ reports, isLoading, error, reviewer = "Head RO" }: MyReportsProps) {
+export function MyReports({ reports, isLoading, error, reviewer = "Head RO", onResubmit }: MyReportsProps) {
   const labels = myStatusLabels(reviewer);
   const [viewingId, setViewingId] = useState<string | null>(null);
 
@@ -89,7 +91,18 @@ export function MyReports({ reports, isLoading, error, reviewer = "Head RO" }: M
                       {labels[report.status]}
                     </span>
                   </td>
-                  <td className="max-w-xs px-4 py-3.5 text-xs text-gray-500">{report.reviewComment || "—"}</td>
+                  <td className="max-w-xs px-4 py-3.5 text-xs text-gray-500">
+                    <p className="whitespace-pre-line">{report.reviewComment || "—"}</p>
+                    {report.status === "rejected" && onResubmit && (
+                      <button
+                        type="button"
+                        onClick={() => onResubmit(report)}
+                        className="mt-2 inline-flex items-center gap-1 whitespace-nowrap rounded-lg border border-brand/30 px-2.5 py-1 text-xs font-semibold text-brand hover:bg-brand/10"
+                      >
+                        <RotateCcw size={12} /> Edit &amp; resubmit
+                      </button>
+                    )}
+                  </td>
                 </tr>
               ))}
 

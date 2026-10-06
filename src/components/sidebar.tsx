@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { signOutUser } from "@/utils/session";
 import { useUnreadNotificationCount } from "@/hooks/useUnreadNotificationCount";
 import { useCurrentProfile, roleTitles } from "@/hooks/useCurrentProfile";
@@ -45,7 +45,6 @@ const navItems = [
 
 export default function Sidebar() {
   const pathname = usePathname();
-  const router = useRouter();
   const { isOpen, close } = useSidebar();
   const unreadCount = useUnreadNotificationCount();
   const { profile } = useCurrentProfile();
@@ -151,7 +150,7 @@ export default function Sidebar() {
             type="button"
             aria-label="Log out"
             title="Log out"
-            onClick={() => signOutUser(router)}
+            onClick={() => signOutUser()}
             className="text-white/70 hover:text-white"
           >
             <LogOut className="h-4 w-4" />

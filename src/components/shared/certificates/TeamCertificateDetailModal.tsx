@@ -12,17 +12,17 @@ export function TeamCertificateDetailModal({ group, onClose }: { group: ApiTeamC
   const organizers = group?.certificates.filter((c) => c.kind === "organizer") ?? [];
 
   return (
-    <Modal isOpen={!!group} title={group?.eventTitle ?? ""} onClose={onClose} size="lg">
+    <Modal isOpen={!!group} title={group?.activityTitle ?? ""} onClose={onClose} size="lg">
       {group && (
         <div className="space-y-5">
           <div className="flex flex-wrap gap-x-5 gap-y-1 text-sm text-gray-500">
             <span className="flex items-center gap-1.5">
               <MapPin className="h-4 w-4" />
-              {group.eventLocation || "—"}
+              {group.activityLocation || "—"}
             </span>
             <span className="flex items-center gap-1.5">
               <Calendar className="h-4 w-4" />
-              {formatCertificateDate(group.eventDate)}
+              {formatCertificateDate(group.activityDate)}
             </span>
             <span>Verified by {group.issuedByName}</span>
           </div>

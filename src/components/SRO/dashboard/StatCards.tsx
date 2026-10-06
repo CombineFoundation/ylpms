@@ -10,7 +10,7 @@ export function StatCards({ stats }: { stats: SRODashboardSummary["stats"] }) {
       value: stats.assignedROs,
       sub: "Reporting Officers in the team",
       icon: Users,
-      accent: "bg-orange-100 text-orange-500",
+      accent: "bg-orange-100 text-brand",
     },
     {
       label: "YOUTH LEADERS",

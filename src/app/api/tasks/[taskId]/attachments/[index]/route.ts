@@ -1,16 +1,16 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { withAuth } from "@/middleware/auth.middleware";
 import { getTaskById } from "@/services/task.service";
 import { getUserById } from "@/services/user.service";
-import { readReportAttachment } from "@/services/report-attachment.service";
+import { reportAttachmentUrl } from "@/services/report-attachment.service";
 import { canAccessUserInChain } from "@/utils/authorization";
 import { AuthenticationError, AuthorizationError, NotFoundError } from "@/utils/errors";
-import { apiError } from "@/utils/api-response";
+import { apiError, apiSuccess } from "@/utils/api-response";
 
 type Params = { params: Promise<{ taskId: string; index: string }> };
 
 /**
- * GET /api/tasks/[taskId]/attachments/[index] - Stream one PDF from a task's submission,
+ * GET /api/tasks/[taskId]/attachments/[index] - A short-lived link to one PDF from a task's submission,
  * to the assignee, the assigner, anyone above the assignee in their chain, and Head RO.
  */
 export async function GET(req: NextRequest, { params }: Params) {
@@ -32,17 +32,7 @@ export async function GET(req: NextRequest, { params }: Params) {
       const attachment = task.submission?.attachments?.[Number(index)];
       if (!attachment) throw new NotFoundError("Attachment not found");
 
-      const contents = await readReportAttachment(attachment);
-      return new NextResponse(new Uint8Array(contents), {
-        status: 200,
-        headers: {
-          "Content-Type": "application/pdf",
-          "Content-Length": String(contents.length),
-          "Content-Disposition": `inline; filename="${attachment.name.replace(/"/g, "")}"`,
-          "Cache-Control": "private, no-store",
-          "X-Content-Type-Options": "nosniff",
-        },
-      });
+      return apiSuccess({ url: await reportAttachmentUrl(attachment, task.assignedTo) });
     } catch (error) {
       return apiError(error);
     }

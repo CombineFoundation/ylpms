@@ -84,7 +84,7 @@ export function DashboardContent() {
           />
 
           <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
-            <ActivitySummaryPanel activities={summary.activities} eventsHref="/Head-of-RO/activities" title="Program Activities" />
+            <ActivitySummaryPanel activities={summary.activities} activitiesHref="/Head-of-RO/activities" title="Program Activities" />
             <RecentNotifications
               notifications={summary.notifications}
               unreadCount={summary.unreadNotificationCount}

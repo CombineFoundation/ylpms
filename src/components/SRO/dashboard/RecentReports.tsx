@@ -31,7 +31,7 @@ export function RecentReports({
     <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-semibold text-slate-700">{title}</h2>
-        <Link href={`${basePath}/reports`} className="text-xs font-medium text-orange-500 flex items-center gap-0.5">
+        <Link href={`${basePath}/reports`} className="text-xs font-medium text-brand flex items-center gap-0.5">
           View all <ChevronRight size={13} />
         </Link>
       </div>

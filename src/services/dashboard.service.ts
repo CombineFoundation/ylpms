@@ -4,7 +4,7 @@ import { getReports, enrichReportsForList } from "./report.service";
 import { getTasks, enrichTasksForList, withEffectiveStatus } from "./task.service";
 import { getTeam } from "./team.service";
 import { getNotificationsForUser, getUnreadNotificationCount } from "./notification.service";
-import { countEventsByStatus } from "./event.service";
+import { countActivitiesByStatus } from "./activity.service";
 import { getCertificatesForUser } from "./certificate.service";
 import { timestampToDate, type TimestampInput } from "@/utils/user-status";
 import { buildRegionBreakdown, lastNMonths, startOfMonth, toDate } from "@/utils/aggregation";
@@ -12,7 +12,8 @@ import { logger } from "@/utils/errors";
 import type { User, UserRole } from "@/types/user.types";
 import type { Task, TaskPriority, TaskStatus } from "@/types/task.types";
 import type { ReportStatus } from "@/types/report.types";
-import type { Event, EventStatus } from "@/types/event.types";
+import type { Activity, ActivityStatus } from "@/types/activity.types";
+import { formatDate } from "@/utils/format-date";
 
 const GROWTH_MONTHS = 7;
 const PENDING_REPORTS_SHOWN = 5;
@@ -97,9 +98,9 @@ export interface SRODashboardSummary {
 
 type TaskRow = { title?: string; assignedTo?: string; status?: TaskStatus; dueDate?: unknown; completedDate?: unknown };
 type ReportRow = { title?: string; status?: ReportStatus; submittedBy?: string; createdAt?: unknown; submittedAt?: unknown };
-type EventRow = {
+type ActivityRow = {
   title?: string;
-  status?: EventStatus;
+  status?: ActivityStatus;
   startDate?: unknown;
   endDate?: unknown;
   location?: string;
@@ -108,7 +109,7 @@ type EventRow = {
   certificateCount?: number;
   certificatesIssuedAt?: unknown;
 };
-const EVENT_FIELDS = [
+const ACTIVITY_FIELDS = [
   "title",
   "status",
   "startDate",
@@ -125,10 +126,9 @@ const SRO_UPCOMING_TASKS_SHOWN = 3;
 const NOTIFICATIONS_SHOWN = 4;
 const ACTIVITY_ITEMS_SHOWN = 4;
 
-const shortDate = (date: Date | null) =>
-  date ? date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "-";
+const shortDate = (date: Date | null) => formatDate(date);
 
-/** Activities (events) a manager is responsible for, and the workflow items waiting on them. */
+/** Activities a manager is responsible for, and the workflow items waiting on them. */
 export interface ActivitySummary {
   /** Youth leaders' proposals waiting on the viewer's approval. */
   awaitingApproval: number;
@@ -138,33 +138,33 @@ export interface ActivitySummary {
   upcoming: number;
   completedThisMonth: number;
   certificatesIssued: number;
-  reviewQueue: { id: string; title: string; status: EventStatus; organizerName: string; date: string }[];
-  upcomingEvents: { id: string; title: string; date: string; location: string; organizerName: string }[];
+  reviewQueue: { id: string; title: string; status: ActivityStatus; organizerName: string; date: string }[];
+  upcomingActivities: { id: string; title: string; date: string; location: string; organizerName: string }[];
 }
 
-const REVIEW_STATUSES: EventStatus[] = ["submitted", "evidence-submitted"];
+const REVIEW_STATUSES: ActivityStatus[] = ["submitted", "evidence-submitted"];
 
 /**
- * Summarizes `events` (already narrowed to the viewer's scope). `canReview`
- * says whether an event's organizer is someone the viewer reviews.
+ * Summarizes `activities` (already narrowed to the viewer's scope). `canReview`
+ * says whether an activity's organizer is someone the viewer reviews.
  */
 async function summarizeActivities(
-  events: (EventRow & { id: string })[],
+  activities: (ActivityRow & { id: string })[],
   canReview: (organizerId: string) => boolean,
   knownNames: (id: string) => string | undefined = () => undefined
 ): Promise<ActivitySummary> {
   const now = new Date();
   const monthStart = startOfMonth();
-  const organizerOf = (event: EventRow) => event.organizerIds?.[0] ?? "";
+  const organizerOf = (activity: ActivityRow) => activity.organizerIds?.[0] ?? "";
 
-  const queue = events
+  const queue = activities
     .filter(
-      (event) =>
-        REVIEW_STATUSES.includes(event.status!) && event.organizerRole === "youth-leader" && canReview(organizerOf(event))
+      (activity) =>
+        REVIEW_STATUSES.includes(activity.status!) && activity.organizerRole === "youth-leader" && canReview(organizerOf(activity))
     )
     .sort((a, b) => (toDate(a.startDate)?.getTime() ?? 0) - (toDate(b.startDate)?.getTime() ?? 0));
-  const upcoming = events
-    .filter((event) => (event.status === "planned" || event.status === "ongoing") && (toDate(event.endDate) ?? now) >= now)
+  const upcoming = activities
+    .filter((activity) => (activity.status === "planned" || activity.status === "ongoing") && (toDate(activity.endDate) ?? now) >= now)
     .sort((a, b) => (toDate(a.startDate)?.getTime() ?? 0) - (toDate(b.startDate)?.getTime() ?? 0));
 
   // Resolve only the names actually shown.
@@ -174,26 +174,26 @@ async function summarizeActivities(
   const nameOf = (id: string) => knownNames(id) ?? fetched.get(id) ?? "Unknown organizer";
 
   return {
-    awaitingApproval: queue.filter((event) => event.status === "submitted").length,
-    awaitingVerification: queue.filter((event) => event.status === "evidence-submitted").length,
+    awaitingApproval: queue.filter((activity) => activity.status === "submitted").length,
+    awaitingVerification: queue.filter((activity) => activity.status === "evidence-submitted").length,
     upcoming: upcoming.length,
-    completedThisMonth: events.filter(
-      (event) => event.status === "completed" && (toDate(event.certificatesIssuedAt) ?? new Date(0)) >= monthStart
+    completedThisMonth: activities.filter(
+      (activity) => activity.status === "completed" && (toDate(activity.certificatesIssuedAt) ?? new Date(0)) >= monthStart
     ).length,
-    certificatesIssued: events.reduce((sum, event) => sum + (event.certificateCount ?? 0), 0),
-    reviewQueue: queue.slice(0, ACTIVITY_ITEMS_SHOWN).map((event) => ({
-      id: event.id,
-      title: event.title || "Untitled activity",
-      status: event.status!,
-      organizerName: nameOf(organizerOf(event)),
-      date: shortDate(toDate(event.startDate)),
+    certificatesIssued: activities.reduce((sum, activity) => sum + (activity.certificateCount ?? 0), 0),
+    reviewQueue: queue.slice(0, ACTIVITY_ITEMS_SHOWN).map((activity) => ({
+      id: activity.id,
+      title: activity.title || "Untitled activity",
+      status: activity.status!,
+      organizerName: nameOf(organizerOf(activity)),
+      date: shortDate(toDate(activity.startDate)),
     })),
-    upcomingEvents: upcoming.slice(0, ACTIVITY_ITEMS_SHOWN).map((event) => ({
-      id: event.id,
-      title: event.title || "Untitled activity",
-      date: shortDate(toDate(event.startDate)),
-      location: event.location || "",
-      organizerName: nameOf(organizerOf(event)),
+    upcomingActivities: upcoming.slice(0, ACTIVITY_ITEMS_SHOWN).map((activity) => ({
+      id: activity.id,
+      title: activity.title || "Untitled activity",
+      date: shortDate(toDate(activity.startDate)),
+      location: activity.location || "",
+      organizerName: nameOf(organizerOf(activity)),
     })),
   };
 }
@@ -247,7 +247,7 @@ async function getTeamDashboardSummary(sroId: string, leadRole: UserRole): Promi
       { tree, members: team, memberIds: teamIds },
       tasks,
       reports,
-      events,
+      activities,
       notificationPage,
       unreadNotificationCount,
       manager,
@@ -255,7 +255,7 @@ async function getTeamDashboardSummary(sroId: string, leadRole: UserRole): Promi
       getTeam(sroId),
       selectFieldsWithIds<TaskRow>("tasks", [], ["title", "assignedTo", "status", "dueDate", "completedDate"]),
       selectFieldsWithIds<ReportRow>("reports", [], ["title", "status", "submittedBy", "createdAt", "submittedAt"]),
-      selectFieldsWithIds<EventRow>("events", [], EVENT_FIELDS),
+      selectFieldsWithIds<ActivityRow>("events", [], ACTIVITY_FIELDS),
       getNotificationsForUser(sroId, { pageSize: NOTIFICATIONS_SHOWN, pageNumber: 1 }),
       getUnreadNotificationCount(sroId),
       getDocById<User>("users", sroId),
@@ -263,7 +263,7 @@ async function getTeamDashboardSummary(sroId: string, leadRole: UserRole): Promi
 
     const taskOwners = new Set([...teamIds, sroId]);
     const reportOwners = leadRole === "volunteer" ? new Set([sroId]) : teamIds;
-    const teamEvents = events.filter((event) => taskOwners.has(event.organizerIds?.[0] ?? ""));
+    const teamActivities = activities.filter((activity) => taskOwners.has(activity.organizerIds?.[0] ?? ""));
 
     const now = new Date();
     const taskOverview = { pending: 0, inProgress: 0, completed: 0, overdue: 0 };
@@ -315,16 +315,16 @@ async function getTeamDashboardSummary(sroId: string, leadRole: UserRole): Promi
         month: label,
         tasksCompleted: teamTasks.filter((task) => task.status === "completed" && inMonth(toDate(task.completedDate))).length,
         reportsSubmitted: teamReports.filter((report) => inMonth(reportDate(report))).length,
-        activitiesCompleted: teamEvents.filter(
-          (event) => event.status === "completed" && inMonth(toDate(event.certificatesIssuedAt))
+        activitiesCompleted: teamActivities.filter(
+          (activity) => activity.status === "completed" && inMonth(toDate(activity.certificatesIssuedAt))
         ).length,
       };
     });
 
-    const [activities, memberRequests] = await Promise.all([
+    const [activitySummary, memberRequests] = await Promise.all([
       // Only ROs and SROs review; a youth leader's own activities are in their pipeline instead.
       summarizeActivities(
-        teamEvents,
+        teamActivities,
         (organizerId) => leadRole !== "volunteer" && teamIds.has(organizerId),
         (id) => tree.nodes[id]?.name ?? (id === sroId ? manager?.name : undefined)
       ),
@@ -364,7 +364,7 @@ async function getTeamDashboardSummary(sroId: string, leadRole: UserRole): Promi
         createdAt: toDate(notification.createdAt)?.toISOString() ?? null,
       })),
       unreadNotificationCount,
-      activities,
+      activities: activitySummary,
       memberRequests,
     };
   } catch (error) {
@@ -404,7 +404,7 @@ export type YouthLeaderDashboardSummary = TeamDashboardSummary & {
 export async function getYouthLeaderDashboardSummary(youthLeaderId: string): Promise<YouthLeaderDashboardSummary> {
   const [team, byStatus, certificates] = await Promise.all([
     getTeamDashboardSummary(youthLeaderId, "volunteer"),
-    countEventsByStatus(youthLeaderId),
+    countActivitiesByStatus(youthLeaderId),
     getCertificatesForUser(youthLeaderId),
   ]);
   return {
@@ -434,7 +434,7 @@ export interface VolunteerDashboardSummary {
   };
   manager: { name: string; role: UserRole } | null;
   upcomingTasks: { id: string; title: string; dueDate: string; priority: TaskPriority; status: TaskStatus }[];
-  upcomingActivities: { id: string; title: string; date: string; location: string; status: EventStatus }[];
+  upcomingActivities: { id: string; title: string; date: string; location: string; status: ActivityStatus }[];
   recentCertificates: { id: string; title: string; eventTitle: string; issuedAt: string }[];
   notifications: SRODashboardSummary["notifications"];
   unreadNotificationCount: number;
@@ -445,10 +445,10 @@ const VOLUNTEER_LIST_SHOWN = 4;
 /** A volunteer's own dashboard: their tasks, the activities they signed up for, and certificates. */
 export async function getVolunteerDashboardSummary(volunteerId: string): Promise<VolunteerDashboardSummary> {
   try {
-    const [volunteer, tasks, events, certificates, notificationPage, unreadNotificationCount] = await Promise.all([
+    const [volunteer, tasks, activities, certificates, notificationPage, unreadNotificationCount] = await Promise.all([
       getDocById<User>("users", volunteerId),
       queryDocs<Task>("tasks", [{ field: "assignedTo", operator: "==", value: volunteerId }]),
-      queryDocs<Event>("events", [{ field: "attendees", operator: "array-contains", value: volunteerId }]),
+      queryDocs<Activity>("events", [{ field: "attendees", operator: "array-contains", value: volunteerId }]),
       getCertificatesForUser(volunteerId),
       getNotificationsForUser(volunteerId, { pageSize: NOTIFICATIONS_SHOWN, pageNumber: 1 }),
       getUnreadNotificationCount(volunteerId),
@@ -462,8 +462,8 @@ export async function getVolunteerDashboardSummary(volunteerId: string): Promise
     const completedTasks = liveTasks.filter((task) => task.status === "completed").length;
     const openTasks = liveTasks.filter((task) => task.status !== "completed");
 
-    const upcomingEvents = events
-      .filter((event) => (event.status === "planned" || event.status === "ongoing") && (toDate(event.endDate) ?? now) >= now)
+    const upcomingActivities = activities
+      .filter((activity) => (activity.status === "planned" || activity.status === "ongoing") && (toDate(activity.endDate) ?? now) >= now)
       .sort((a, b) => (toDate(a.startDate)?.getTime() ?? 0) - (toDate(b.startDate)?.getTime() ?? 0));
     const attended = certificates.filter((certificate) => certificate.kind === "participation").length;
 
@@ -473,7 +473,7 @@ export async function getVolunteerDashboardSummary(volunteerId: string): Promise
         overdueTasks: openTasks.filter((task) => task.status === "overdue").length,
         completedTasks,
         completionRate: liveTasks.length > 0 ? Math.round((completedTasks / liveTasks.length) * 100) : null,
-        upcomingActivities: upcomingEvents.length,
+        upcomingActivities: upcomingActivities.length,
         activitiesAttended: attended,
         certificates: certificates.length,
       },
@@ -488,12 +488,12 @@ export async function getVolunteerDashboardSummary(volunteerId: string): Promise
           priority: task.priority,
           status: task.status,
         })),
-      upcomingActivities: upcomingEvents.slice(0, VOLUNTEER_LIST_SHOWN).map((event) => ({
-        id: event.id,
-        title: event.title,
-        date: shortDate(toDate(event.startDate)),
-        location: event.location,
-        status: event.status,
+      upcomingActivities: upcomingActivities.slice(0, VOLUNTEER_LIST_SHOWN).map((activity) => ({
+        id: activity.id,
+        title: activity.title,
+        date: shortDate(toDate(activity.startDate)),
+        location: activity.location,
+        status: activity.status,
       })),
       recentCertificates: certificates.slice(0, VOLUNTEER_LIST_SHOWN).map((certificate) => ({
         id: certificate.id,
@@ -533,7 +533,7 @@ export async function getHeadRODashboardSummary(viewerId: string): Promise<HeadR
       pendingReportCount,
       upcomingTasksPage,
       overdueTaskCount,
-      events,
+      activities,
       notificationPage,
       unreadNotificationCount,
     ] = await Promise.all([
@@ -552,16 +552,16 @@ export async function getHeadRODashboardSummary(viewerId: string): Promise<HeadR
         { field: "status", operator: "in", value: ["assigned", "in-progress", "overdue"] },
         { field: "dueDate", operator: "<", value: now },
       ]),
-      selectFieldsWithIds<EventRow>("events", [], EVENT_FIELDS),
+      selectFieldsWithIds<ActivityRow>("events", [], ACTIVITY_FIELDS),
       getNotificationsForUser(viewerId, { pageSize: NOTIFICATIONS_SHOWN, pageNumber: 1 }),
       getUnreadNotificationCount(viewerId),
     ]);
 
-    const [pendingReports, upcomingTasks, activities] = await Promise.all([
+    const [pendingReports, upcomingTasks, activitySummary] = await Promise.all([
       enrichReportsForList(pendingReportsPage.items),
       enrichTasksForList(upcomingTasksPage.items),
       // Head RO can review every youth leader's activity.
-      summarizeActivities(events, () => true),
+      summarizeActivities(activities, () => true),
     ]);
 
     return {
@@ -581,15 +581,13 @@ export async function getHeadRODashboardSummary(viewerId: string): Promise<HeadR
         return {
           id: task.id,
           title: task.title,
-          dueDate: dueDate
-            ? dueDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
-            : "-",
+          dueDate: formatDate(dueDate),
           priority: task.priority,
           status: task.status,
           assigneeName: task.assigneeName,
         };
       }),
-      activities,
+      activities: activitySummary,
       notifications: notificationPage.items.map((notification) => ({
         id: notification.id,
         title: notification.title,

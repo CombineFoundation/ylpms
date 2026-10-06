@@ -9,11 +9,14 @@ import { PageHeader, emptyMessage } from "../shared/ListParts";
 import { UserToolbar } from "../shared/UserToolbar";
 import { ManagerFilter } from "../shared/ManagerFilter";
 import { UserDetailModal } from "../shared/UserDetailModal";
+import { useUserAdminActions } from "../shared/useUserAdminActions";
+import { AssignRoModal } from "./AssignRoModal";
 import { matchesQuery, regionOptions, toUserRow, type ApiUser, type StatusFilter, type UserRow } from "../shared/users";
 
 /**
  * Directory of Youth Leaders. Head RO can add one directly (an RO's additions
- * need SRO approval instead), but not edit existing ones, per the permissions spec.
+ * need SRO approval instead), give one a new RO, and suspend or reactivate them;
+ * their details aren't edited here, per the permissions spec.
  */
 export function YouthLeadersList() {
   const [managerId, setManagerId] = useState("");
@@ -35,6 +38,9 @@ export function YouthLeadersList() {
   const [viewing, setViewing] = useState<UserRow | null>(null);
   const [isAdding, setIsAdding] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [assigning, setAssigning] = useState<UserRow | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const admin = useUserAdminActions("youth leader", list.reload);
 
   const handleAdd = async (values: AddYouthLeaderForm) => {
     setFormError(null);
@@ -75,6 +81,15 @@ export function YouthLeadersList() {
     <div className="space-y-6">
       <PageHeader title="Youth Leaders" description="Registered youth leaders under each RO." />
 
+      {notice && (
+        <div role="status" className="flex items-center justify-between gap-3 rounded-lg border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+          <span>{notice}</span>
+          <button type="button" onClick={() => setNotice(null)} className="text-xs font-medium hover:underline">
+            Dismiss
+          </button>
+        </div>
+      )}
+
       <UserToolbar
         query={query}
         onQueryChange={setQuery}
@@ -110,10 +125,22 @@ export function YouthLeadersList() {
         isLoadingMore={list.isLoadingMore}
         onLoadMore={list.loadMore}
         onView={setViewing}
+        onAssignRo={setAssigning}
+        onStatusChange={admin.requestStatusChange}
       />
 
       <UserDetailModal user={viewing} managerLabel="Reporting Officer" reportsLabel="Volunteers" onClose={() => setViewing(null)} />
       <AddYouthLeaderModal isOpen={isAdding} error={formError} onClose={() => setIsAdding(false)} onSubmit={handleAdd} />
+      <AssignRoModal
+        leader={assigning}
+        onClose={() => setAssigning(null)}
+        onAssigned={(message) => {
+          setAssigning(null);
+          setNotice(message);
+          list.reload();
+        }}
+      />
+      {admin.dialog}
     </div>
   );
 }

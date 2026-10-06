@@ -71,7 +71,12 @@ export default function LoginContent({ stats }: { stats: PublicStats }) {
 
       document.cookie = `role=${role}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Lax`;
 
-      router.replace(routes[role]);
+      // After their cohort ends, youth leaders and volunteers can only open their certificates.
+      const home = sessionResult.data?.accessClosed ? routes[role].replace(/\/dashboard$/, "/certificates") : routes[role];
+      // New accounts replace their emailed temporary password first.
+      router.replace(
+        sessionResult.data?.mustChangePassword ? `/change-password?next=${encodeURIComponent(home)}` : home
+      );
     } catch (loginError) {
       console.error("Login failed:", loginError);
       const code = (loginError as { code?: string } | null)?.code;
@@ -92,7 +97,7 @@ export default function LoginContent({ stats }: { stats: PublicStats }) {
   return (
     <div className="min-h-screen w-full flex flex-col lg:flex-row">
       {/* Left panel */}
-      <div className="relative w-full lg:w-1/2 min-h-125 lg:min-h-screen bg-[#E8622C] overflow-hidden flex flex-col">
+      <div className="relative w-full lg:w-1/2 min-h-125 lg:min-h-screen bg-brand overflow-hidden flex flex-col">
         {/* subtle diagonal shading in the lower right, matching the reference */}
         <div className="pointer-events-none absolute -bottom-24 -right-24 w-[420px] h-[420px] bg-black/10 rounded-full blur-3xl" />
         <div className="pointer-events-none absolute bottom-0 right-0 w-2/3 h-1/2 bg-gradient-to-tl from-black/20 to-transparent" />
@@ -152,7 +157,7 @@ export default function LoginContent({ stats }: { stats: PublicStats }) {
           </p>
           <div className="grid grid-cols-3 gap-4 divide-x divide-white/10">
             <div>
-              <p className="text-[#E8622C] font-bold text-xl sm:text-2xl">
+              <p className="text-brand font-bold text-xl sm:text-2xl">
                 {formatCount(stats.total.webinars + stats.total.onsiteWorkshops)}
               </p>
               <p className="text-white/60 text-[11px] sm:text-xs mt-1">
@@ -160,7 +165,7 @@ export default function LoginContent({ stats }: { stats: PublicStats }) {
               </p>
             </div>
             <div className="pl-4">
-              <p className="text-[#E8622C] font-bold text-xl sm:text-2xl">
+              <p className="text-brand font-bold text-xl sm:text-2xl">
                 {formatCount(stats.total.directBeneficiaries)}
               </p>
               <p className="text-white/60 text-[11px] sm:text-xs mt-1">
@@ -168,7 +173,7 @@ export default function LoginContent({ stats }: { stats: PublicStats }) {
               </p>
             </div>
             <div className="pl-4">
-              <p className="text-[#E8622C] font-bold text-xl sm:text-2xl">
+              <p className="text-brand font-bold text-xl sm:text-2xl">
                 {formatReach(stats.total.digitalReach)}
               </p>
               <p className="text-white/60 text-[11px] sm:text-xs mt-1">
@@ -218,7 +223,7 @@ export default function LoginContent({ stats }: { stats: PublicStats }) {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="name@university.edu"
-                  className="w-full rounded-md border border-gray-200 bg-white py-2.5 pl-10 pr-3 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#E8622C]/40 focus:border-[#E8622C]"
+                  className="w-full rounded-md border border-gray-200 bg-white py-2.5 pl-10 pr-3 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand"
                 />
               </div>
             </div>
@@ -241,7 +246,7 @@ export default function LoginContent({ stats }: { stats: PublicStats }) {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••"
-                  className="w-full rounded-md border border-gray-200 bg-white py-2.5 pl-10 pr-10 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#E8622C]/40 focus:border-[#E8622C]"
+                  className="w-full rounded-md border border-gray-200 bg-white py-2.5 pl-10 pr-10 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand"
                 />
                 <button
                   type="button"
@@ -260,7 +265,7 @@ export default function LoginContent({ stats }: { stats: PublicStats }) {
                 <button
                   type="button"
                   onClick={() => setIsForgotOpen(true)}
-                  className="text-xs text-gray-500 hover:text-[#E8622C] transition-colors"
+                  className="text-xs text-gray-500 hover:text-brand transition-colors"
                 >
                   Forgot password?
                 </button>
@@ -272,7 +277,7 @@ export default function LoginContent({ stats }: { stats: PublicStats }) {
             <button
               type="submit"
               disabled={isSigningIn}
-              className="w-full rounded-full bg-[#E8622C] py-3 text-sm font-semibold text-white hover:bg-[#d9551f] transition-colors focus:outline-none focus:ring-2 focus:ring-[#E8622C]/50 focus:ring-offset-2"
+              className="w-full rounded-full bg-brand py-3 text-sm font-semibold text-white hover:bg-brand-dark transition-colors focus:outline-none focus:ring-2 focus:ring-brand/50 focus:ring-offset-2"
             >
               {isSigningIn ? "Signing in..." : "Sign In"}
             </button>

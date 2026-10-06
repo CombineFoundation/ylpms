@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { withAuth } from "@/middleware/auth.middleware";
 import { assignUsersToManager, getUserById } from "@/services/user.service";
+import { reassignPendingRequests } from "@/services/member-request.service";
 import { AuthenticationError, NotFoundError } from "@/utils/errors";
 import { requireRole } from "@/utils/auth";
 import { requireCanManageUser, requireUserChainAccess } from "@/utils/authorization";
@@ -41,6 +42,8 @@ export async function POST(
 
       // Role pairing + previous-manager cleanup are enforced in the service.
       await assignUsersToManager(managerId, userIds, authReq.user.userId);
+      // Their pending member requests now go to the new manager.
+      await reassignPendingRequests(userIds, managerId);
 
       return apiSuccess({ message: "Users assigned successfully" });
     } catch (error) {

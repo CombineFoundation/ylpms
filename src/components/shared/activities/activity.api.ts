@@ -1,7 +1,7 @@
 import { apiFetch } from "@/lib/api-client";
 import { openAuthenticatedPdf } from "@/lib/report-attachments";
 import { scopedPath } from "@/hooks/usePortalScope";
-import type { EventWorkflowAction } from "@/types/event.types";
+import type { ActivityWorkflowAction } from "@/types/activity.types";
 import type { ReportAttachment } from "@/types/report.types";
 import type { ScopedRole } from "@/utils/portal-scope";
 import type { ActivityForm, ActivityPortal } from "./activity.types";
@@ -24,39 +24,39 @@ export function saveActivity(values: ActivityForm, activityId: string | null, sc
     endDate: new Date(values.endDate).toISOString(),
   };
   return activityId
-    ? apiFetch(withScope(`/api/events/${activityId}`, scope), {
+    ? apiFetch(withScope(`/api/activities/${activityId}`, scope), {
         method: "PATCH",
         // null clears a previously set attendee cap.
         body: { ...body, maxAttendees: values.maxAttendees ? Number(values.maxAttendees) : null },
       })
-    : apiFetch(withScope("/api/events", scope), {
+    : apiFetch(withScope("/api/activities", scope), {
         method: "POST",
         body: { ...body, maxAttendees: values.maxAttendees ? Number(values.maxAttendees) : undefined },
       });
 }
 
 export type WorkflowBody =
-  | { action: Exclude<EventWorkflowAction, "submit-evidence">; comment?: string }
+  | { action: Exclude<ActivityWorkflowAction, "submit-evidence">; comment?: string }
   | {
       action: "submit-evidence";
       evidence: { summary: string; participantIds: string[]; attachments: ReportAttachment[] };
     };
 
 export function runWorkflow(activityId: string, body: WorkflowBody, scope: ActivityScope) {
-  return apiFetch(withScope(`/api/events/${activityId}/workflow`, scope), { method: "POST", body });
+  return apiFetch(withScope(`/api/activities/${activityId}/workflow`, scope), { method: "POST", body });
 }
 
 export function setAttendance(activityId: string, join: boolean, scope: ActivityScope) {
-  return apiFetch<{ attendeeCount: number }>(withScope(`/api/events/${activityId}/attendance`, scope), {
+  return apiFetch<{ attendeeCount: number }>(withScope(`/api/activities/${activityId}/attendance`, scope), {
     method: "POST",
     body: { action: join ? "join" : "leave" },
   });
 }
 
 export function deleteActivity(activityId: string, scope: ActivityScope) {
-  return apiFetch(withScope(`/api/events/${activityId}`, scope), { method: "DELETE" });
+  return apiFetch(withScope(`/api/activities/${activityId}`, scope), { method: "DELETE" });
 }
 
 export function openEvidencePdf(activityId: string, index: number, scope: ActivityScope) {
-  return openAuthenticatedPdf(withScope(`/api/events/${activityId}/evidence/${index}`, scope));
+  return openAuthenticatedPdf(withScope(`/api/activities/${activityId}/evidence/${index}`, scope));
 }

@@ -67,7 +67,7 @@ Version Control
 # UI Theme
 
 Primary Color
-#F97316
+#E8622C (Tailwind `brand`; hover `brand-dark` #D9551F) — decided Oct 2026, replacing the original #F97316. Use the `brand` classes, never `orange-500/600` or a hex value.
 
 Secondary
 #0F172A
@@ -281,6 +281,8 @@ Activity Logs
 ---
 
 # Training Portal
+
+> **Decision (Oct 2026):** the MVP Training Portal is a resource library — Head RO / SRO upload files (videos, PDFs, slides), everyone else views and downloads them. Courses, lessons, assignments, progress tracking and course certificates below are **future scope**.
 
 Admin
 
@@ -635,6 +637,8 @@ Deployment
 ---
 
 # Future Scope
+
+Training Courses (lessons, assignments, progress tracking, course certificates)
 
 AI Report Generator
 

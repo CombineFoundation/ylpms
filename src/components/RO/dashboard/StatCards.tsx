@@ -10,7 +10,7 @@ export function StatCards({ stats }: { stats: RODashboardSummary["stats"] }) {
       value: stats.leads,
       sub: "Reporting to you",
       icon: Heart,
-      accent: "bg-orange-100 text-orange-500",
+      accent: "bg-orange-100 text-brand",
     },
     {
       label: "VOLUNTEERS",

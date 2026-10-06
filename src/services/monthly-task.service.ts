@@ -9,6 +9,7 @@ import { TASKS_ROUTE_BY_ROLE } from "./task.service";
 import { getTeam } from "./team.service";
 import { asCycleCohort, getCurrentCohort } from "./cohort.service";
 import { FIRST_SYSTEM_COHORT } from "@/config/cohorts";
+import { formatDate } from "@/utils/format-date";
 import type { Task } from "@/types/task.types";
 import type { User, UserRole } from "@/types/user.types";
 
@@ -16,7 +17,8 @@ import type { User, UserRole } from "@/types/user.types";
  * Monthly Tasks - each program month (15th → 15th) has a fixed task list per
  * role. Head RO assigns it to everyone; an SRO or RO to their own team. Task
  * ids are deterministic (month + template + user), so whoever clicks first
- * assigns it and later clicks only fill in people added since.
+ * assigns it and later clicks only fill in people added since. Each task is
+ * recorded as assigned by the youth leader's RO, who alone reviews it.
  */
 
 type Caller = { userId: string; role: UserRole };
@@ -96,8 +98,7 @@ async function planMonthlyTasks(caller: Caller): Promise<{ cycle: MonthlyCycle |
   return { cycle, plan: { cycle, templatesByRole, recipients, missing }, roles };
 }
 
-const dueLabel = (cycle: MonthlyCycle) =>
-  cycle.end.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "Asia/Karachi" });
+const dueLabel = (cycle: MonthlyCycle) => formatDate(cycle.end);
 
 /** What "Assign Monthly Task" would do for this caller right now. */
 export async function getMonthlyTaskStatus(caller: Caller): Promise<MonthlyTaskStatus> {
@@ -150,7 +151,9 @@ export async function assignMonthlyTasks(caller: Caller, actorUserId = caller.us
           status: "assigned",
           priority: template.priority ?? "medium",
           assignedTo: user.id,
-          assignedBy: caller.userId,
+          // The youth leader's own RO owns (sees and reviews) the task, whoever clicked;
+          // Head RO and SROs only view their team's monthly tasks.
+          assignedBy: ("reportingToId" in user && user.reportingToId) || caller.userId,
           dueDate: template.dueDate ? endOfPktDay(template.dueDate) : cycle.end,
           monthlyCycle: cycle.key,
           monthlyTemplateId: template.id,

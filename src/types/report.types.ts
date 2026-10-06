@@ -22,6 +22,8 @@ export interface Report {
   submittedBy: string; // User ID
   reviewedBy?: string; // User ID
   reviewComment?: string; // Reviewer's feedback, e.g. why it was rejected
+  /** The feedback a returned report was resubmitted after, so the reviewer can check it was addressed. */
+  previousReviewComment?: string;
   period: {
     startDate: Timestamp | Date;
     endDate: Timestamp | Date;

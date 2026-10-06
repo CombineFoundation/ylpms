@@ -1,126 +1,23 @@
 rules_version = '2';
 
+// The app never reads or writes Firestore from the browser: every read and
+// write goes through the API routes (Admin SDK), which enforce roles, the
+// reporting chain and workflow rules. Direct client access would bypass all
+// of that (e.g. an assignee marking their own task completed, or an organizer
+// skipping activity approval), so it's denied for everyone but developers.
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    function isAuthenticated() {
-      return request.auth != null;
-    }
-
-    function isOwner(userId) {
-      return isAuthenticated() &&
-        request.auth.uid == userId;
-    }
-
     function isDeveloper() {
-      return isAuthenticated() &&
-        get(
-          /databases/$(database)/documents/users/$(request.auth.uid)
-        ).data.role == "developer";
-    }
-
-    function userRole() {
-      return get(
-        /databases/$(database)/documents/users/$(request.auth.uid)
-      ).data.role;
-    }
-
-    function hasRole(roles) {
-      return isAuthenticated() && userRole() in roles;
+      return request.auth != null &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "developer";
     }
 
     match /users/{userId} {
-
-      // User can read their own profile.
-      // Developer can read all profiles.
-      allow read: if isOwner(userId) || isDeveloper();
-
-      // Only developer can create/delete users.
-      allow create, delete: if isDeveloper();
-
-      // User can update ONLY lastLoginAt on their own profile.
-      // Developer can update any user profile.
-      allow update: if (
-        isOwner(userId) &&
-        request.resource.data.diff(resource.data)
-          .affectedKeys()
-          .hasOnly(["lastLoginAt"])
-      ) || isDeveloper();
+      // A user can read their own profile; nothing else is open to clients.
+      allow read: if request.auth != null && request.auth.uid == userId;
     }
 
-    match /reports/{reportId} {
-      // Submitter can read their own report. Head RO/developer can read all.
-      // (SRO/RO reading a subordinate's report goes through the API's Admin SDK
-      // chain check for now; client-side chain traversal isn't modeled here.)
-      allow read: if isDeveloper() ||
-        hasRole(["head-ro"]) ||
-        (isAuthenticated() && resource.data.submittedBy == request.auth.uid);
-
-      // Youth Leader and above can submit reports (volunteers don't).
-      allow create: if isDeveloper() ||
-        (hasRole(["youth-leader", "ro", "sro", "head-ro"]) &&
-          request.resource.data.submittedBy == request.auth.uid);
-
-      // Only Head RO/developer review (approve/reject) reports today.
-      allow update: if isDeveloper() || hasRole(["head-ro"]);
-
-      allow delete: if isDeveloper() || hasRole(["head-ro"]);
-    }
-
-    match /tasks/{taskId} {
-      // The assignee, the assigner, and Head RO/developer can read a task.
-      allow read: if isDeveloper() ||
-        hasRole(["head-ro"]) ||
-        (isAuthenticated() &&
-          (resource.data.assignedTo == request.auth.uid ||
-            resource.data.assignedBy == request.auth.uid));
-
-      // Volunteers only receive tasks, they don't assign them.
-      allow create: if isDeveloper() ||
-        (hasRole(["youth-leader", "ro", "sro", "head-ro"]) &&
-          request.resource.data.assignedBy == request.auth.uid);
-
-      allow update: if isDeveloper() ||
-        hasRole(["head-ro"]) ||
-        (isAuthenticated() &&
-          (resource.data.assignedTo == request.auth.uid ||
-            resource.data.assignedBy == request.auth.uid));
-
-      allow delete: if isDeveloper() ||
-        hasRole(["head-ro"]) ||
-        (isAuthenticated() && resource.data.assignedBy == request.auth.uid);
-    }
-
-    match /events/{eventId} {
-      // Events are org-wide viewable by any signed-in member.
-      allow read: if isAuthenticated();
-
-      // Volunteers attend events, they don't organize them.
-      allow create: if isDeveloper() ||
-        (hasRole(["youth-leader", "ro", "sro", "head-ro"]) &&
-          request.auth.uid in request.resource.data.organizerIds);
-
-      allow update, delete: if isDeveloper() ||
-        hasRole(["head-ro"]) ||
-        (isAuthenticated() && request.auth.uid in resource.data.organizerIds);
-    }
-
-    match /notificationPreferences/{userId} {
-      // Doc id is the owning user's uid — a direct owner check, no lookup needed.
-      allow read, write: if isOwner(userId) || isDeveloper();
-    }
-
-    match /notifications/{notificationId} {
-      // Only the recipient (or developer) may read, mark as read, or delete
-      // their own notification. Notifications are only ever created by the
-      // Admin SDK (server-side), so client-side create is never allowed.
-      allow read, update, delete: if isDeveloper() ||
-        (isAuthenticated() && resource.data.userId == request.auth.uid);
-
-      allow create: if isDeveloper();
-    }
-
-    // Developer has full access to all other collections.
     match /{document=**} {
       allow read, write: if isDeveloper();
     }

@@ -16,7 +16,7 @@ export function PortalScopePicker({ role, className = "" }: { role: ScopedRole; 
       <Eye className="h-4 w-4 shrink-0" />
       <span className="font-medium">Developer view</span>
       {error ? (
-        <span className="text-orange-700">{error}</span>
+        <span className="text-brand-dark">{error}</span>
       ) : (
         <label className="flex items-center gap-2">
           <span>Acting as {roleName}:</span>

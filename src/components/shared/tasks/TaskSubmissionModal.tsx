@@ -160,7 +160,7 @@ export function TaskSubmissionModal({ task, canReview = false, onClose, onReview
                       type="button"
                       onClick={() => review("request-changes")}
                       disabled={isBusy}
-                      className="flex items-center gap-1.5 rounded-lg bg-orange-500 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-60"
+                      className="flex items-center gap-1.5 rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       <RotateCcw className="h-4 w-4" /> {isBusy ? "Sending..." : "Send back"}
                     </button>
@@ -171,7 +171,7 @@ export function TaskSubmissionModal({ task, canReview = false, onClose, onReview
                       type="button"
                       onClick={() => setIsRequestingChanges(true)}
                       disabled={isBusy}
-                      className="flex items-center gap-1.5 rounded-lg border border-orange-200 px-4 py-2 text-sm font-medium text-orange-600 hover:bg-orange-50"
+                      className="flex items-center gap-1.5 rounded-lg border border-orange-200 px-4 py-2 text-sm font-medium text-brand-dark hover:bg-orange-50"
                     >
                       <RotateCcw className="h-4 w-4" /> Ask for changes
                     </button>
@@ -198,7 +198,7 @@ function ReviewNote({ review }: { review: ApiTaskReview }) {
   const accepted = review.decision === "accepted";
   return (
     <div
-      className={`rounded-lg px-4 py-3 text-sm ${accepted ? "bg-emerald-50 text-emerald-700" : "bg-orange-50 text-orange-700"}`}
+      className={`rounded-lg px-4 py-3 text-sm ${accepted ? "bg-emerald-50 text-emerald-700" : "bg-orange-50 text-brand-dark"}`}
     >
       <p className="font-semibold">
         {accepted ? "Accepted" : "Changes requested"} · {formatRelativeTime(review.reviewedAt)}

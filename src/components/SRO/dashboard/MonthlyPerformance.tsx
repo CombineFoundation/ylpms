@@ -13,7 +13,7 @@ import type { SRODashboardSummary } from "./dashboard.types";
 
 const SERIES = [
   { key: "tasksCompleted", label: "Tasks completed", color: "#10b981", dot: "bg-emerald-500" },
-  { key: "reportsSubmitted", label: "Reports submitted", color: "#f97316", dot: "bg-orange-500" },
+  { key: "reportsSubmitted", label: "Reports submitted", color: "#f97316", dot: "bg-brand" },
   { key: "activitiesCompleted", label: "Activities completed", color: "#6366f1", dot: "bg-indigo-500" },
 ] as const;
 

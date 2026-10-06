@@ -137,10 +137,12 @@ export async function createUser(
       name: data.name,
       memberId,
       university: data.university || undefined,
+      teamRole: data.role === "volunteer" ? data.teamRole?.trim() || undefined : undefined,
       cohortId: COHORT_ROLES.includes(data.role) ? (await getCurrentCohort()).id : undefined,
       region: data.region,
       role: data.role,
       status: "pending", // Promoted to "active" on first sign-in (POST /api/auth/session)
+      mustChangePassword: true, // Cleared once they replace the emailed password (POST /api/auth/password-changed)
       phone: data.phone,
       createdAt: new Date(),
       updatedAt: new Date(),

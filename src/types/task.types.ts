@@ -37,7 +37,7 @@ export interface Task {
   /** Set on program-month tasks (see src/config/monthly-tasks.ts), e.g. "month-1". */
   monthlyCycle?: string;
   monthlyTemplateId?: string;
-  /** The assigner's activity (event) this task is for, and its title at link time. */
+  /** The assigner's activity (activity) this task is for, and its title at link time. */
   eventId?: string;
   eventTitle?: string;
 }

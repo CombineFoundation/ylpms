@@ -41,6 +41,22 @@ export class AccountDisabledError extends AppError {
   }
 }
 
+/** 403: a youth leader's or volunteer's cohort has ended; only their certificates stay available. */
+export class CohortClosedError extends AppError {
+  constructor(message: string = "Your cohort has ended, so your access is limited to downloading your certificates.") {
+    super(message, 403, "COHORT_CLOSED");
+    this.name = "CohortClosedError";
+  }
+}
+
+/** 403: a new account must replace its emailed temporary password before using the app. */
+export class PasswordChangeRequiredError extends AppError {
+  constructor(message: string = "Please set a new password to continue.") {
+    super(message, 403, "PASSWORD_CHANGE_REQUIRED");
+    this.name = "PasswordChangeRequiredError";
+  }
+}
+
 export class NotFoundError extends AppError {
   constructor(message: string = "Resource not found") {
     super(message, 404, "NOT_FOUND");
@@ -100,6 +116,11 @@ function fromZodError(error: ZodError): ValidationError {
 export function handleError(error: unknown): ErrorResponse {
   if (error instanceof ZodError) {
     error = fromZodError(error);
+  }
+
+  // `await req.json()` on a malformed body: the client's fault, not a server error.
+  if (error instanceof SyntaxError) {
+    error = new ValidationError("The request body isn't valid JSON");
   }
 
   if (error instanceof AppError) {

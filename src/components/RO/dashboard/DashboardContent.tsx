@@ -4,6 +4,7 @@ import Link from "next/link";
 import { CalendarDays, FileText, Plus } from "lucide-react";
 import { usePortalData } from "@/hooks/usePortalScope";
 import { useCurrentProfile } from "@/hooks/useCurrentProfile";
+import { formatDate } from "@/utils/format-date";
 import { MonthlyPerformance } from "@/components/SRO/dashboard/MonthlyPerformance";
 import { RoPerformance } from "@/components/SRO/dashboard/RoPerformance";
 import { TaskOverview } from "@/components/SRO/dashboard/TaskOverview";
@@ -18,7 +19,7 @@ import type { RODashboardSummary } from "./dashboard.types";
 function WelcomeBanner() {
   const { profile } = useCurrentProfile();
   const firstName = profile?.name?.split(" ")[0];
-  const today = new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  const today = formatDate(new Date());
 
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -30,7 +31,7 @@ function WelcomeBanner() {
         <span className="hidden text-xs text-slate-400 sm:block">{today}</span>
         <Link
           href="/RO/tasks?new=1"
-          className="flex items-center gap-1.5 rounded-lg bg-orange-500 px-4 py-2 text-sm font-medium text-white hover:bg-orange-600"
+          className="flex items-center gap-1.5 rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-dark"
         >
           <Plus size={15} />
           Assign Task
@@ -70,7 +71,7 @@ export function DashboardContent() {
       {!isLoading && error && (
         <div role="alert" className="flex items-center gap-3 text-sm text-red-500">
           {error}
-          <button type="button" onClick={reload} className="font-medium text-orange-500 hover:underline">
+          <button type="button" onClick={reload} className="font-medium text-brand hover:underline">
             Retry
           </button>
         </div>
@@ -96,7 +97,7 @@ export function DashboardContent() {
           </div>
 
           <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-            <ActivitySummaryPanel activities={summary.activities} eventsHref="/RO/activities" title="Team Activities" />
+            <ActivitySummaryPanel activities={summary.activities} activitiesHref="/RO/activities" title="Team Activities" />
             <RecentNotifications
               notifications={summary.notifications}
               unreadCount={summary.unreadNotificationCount}

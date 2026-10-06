@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { signOutUser } from "@/utils/session";
 import { roleTitles, useCurrentProfile } from "@/hooks/useCurrentProfile";
 import { useUnreadNotificationCount } from "@/hooks/useUnreadNotificationCount";
@@ -36,20 +36,23 @@ type PortalSidebarProps = {
 /** Sidebar shared by the SRO, RO, Youth Leader and Volunteer portals: nav, unread badge, signed-in user, sign-out. */
 export function PortalSidebar({ navItems, portalName, notificationsHref }: PortalSidebarProps) {
   const pathname = usePathname();
-  const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const { profile } = useCurrentProfile();
   // Shared store, so marking notifications read updates this badge immediately.
   const unreadCount = useUnreadNotificationCount();
 
   const badgeFor = (href: string) => (href === notificationsHref && unreadCount > 0 ? unreadCount : null);
+  // Once a youth leader's or volunteer's cohort has ended, only their certificates stay open.
+  const visibleItems = profile?.cohortAccess?.closed
+    ? navItems.filter((item) => item.href.endsWith("/certificates"))
+    : navItems;
 
   return (
     <>
       {/* Mobile menu button */}
       <button
         onClick={() => setIsOpen(true)}
-        className="lg:hidden fixed top-4 left-4 z-50 p-2 rounded-lg bg-[#E8622C] text-white hover:bg-[#d45520] transition-colors"
+        className="lg:hidden fixed top-4 left-4 z-50 p-2 rounded-lg bg-brand text-white hover:bg-brand-dark transition-colors"
         aria-label="Open menu"
       >
         <Menu className="h-5 w-5" />
@@ -67,7 +70,7 @@ export function PortalSidebar({ navItems, portalName, notificationsHref }: Porta
       <aside
         className={`
           fixed lg:sticky top-0 left-0 z-50
-          w-64 shrink-0 flex-col bg-[#E8622C]
+          w-64 shrink-0 flex-col bg-brand
           transition-transform duration-300 ease-in-out
           ${isOpen ? "translate-x-0" : "-translate-x-full"}
           lg:translate-x-0 lg:flex
@@ -98,7 +101,7 @@ export function PortalSidebar({ navItems, portalName, notificationsHref }: Porta
         </p>
 
         <nav className="mt-2 flex-1 space-y-1 px-3">
-          {navItems.map((item) => {
+          {visibleItems.map((item) => {
             const active = pathname.startsWith(item.href);
             const badge = badgeFor(item.href);
             return (
@@ -138,7 +141,7 @@ export function PortalSidebar({ navItems, portalName, notificationsHref }: Porta
           <button
             type="button"
             aria-label="Log out"
-            onClick={() => signOutUser(router)}
+            onClick={() => signOutUser()}
             className="text-white/70 hover:text-white transition-colors"
           >
             <LogOut className="h-4 w-4" />

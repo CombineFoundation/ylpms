@@ -7,7 +7,7 @@ type AnalyticsStatCardsProps = {
 
 const CARD_META = [
   { key: "totalUsers" as const, label: "Total Users", icon: Users },
-  { key: "eventsThisMonth" as const, label: "Activities This Month", icon: CalendarDays },
+  { key: "activitiesThisMonth" as const, label: "Activities This Month", icon: CalendarDays },
   { key: "reportsFiled" as const, label: "Reports Filed", icon: FileText },
   { key: "tasksCompleted" as const, label: "Tasks Completed", icon: ClipboardCheck },
 ];

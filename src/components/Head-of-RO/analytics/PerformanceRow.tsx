@@ -1,7 +1,7 @@
 import { ChevronRight } from "lucide-react";
 import { ROLE_LABELS, type PerformanceNode } from "./analytics.types";
 
-const AVATAR_COLORS = ["bg-red-400", "bg-orange-400", "bg-blue-500", "bg-emerald-500", "bg-orange-500", "bg-purple-500"];
+const AVATAR_COLORS = ["bg-red-400", "bg-orange-400", "bg-blue-500", "bg-emerald-500", "bg-brand", "bg-purple-500"];
 
 function initials(name: string) {
   const parts = name.trim().split(/\s+/);

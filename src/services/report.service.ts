@@ -1,6 +1,6 @@
 import {
   createDoc,
-  updateDoc,
+  updateDocIfStatus,
   deleteDocFromFirestore,
   queryPage,
   getDocById,
@@ -13,7 +13,7 @@ import {
   ReportStatus,
   CreateReportRequest,
 } from "@/types/report.types";
-import { NotFoundError, ValidationError, logger } from "@/utils/errors";
+import { AuthorizationError, ConflictError, NotFoundError, ValidationError, logger } from "@/utils/errors";
 import { isInManagerChain } from "@/utils/authorization";
 import { createActivityLog } from "./activitylog.service";
 import {
@@ -80,24 +80,7 @@ export async function createReport(
       entityId: reportId,
     });
 
-    // Notify Head ROs so a new report shows up without them polling the list.
-    try {
-      const submitter = await getDocById<User>("users", submittedByUserId);
-      const headRoIds = (await getUserIdsByRoles(["head-ro", "developer"])).filter(
-        (id) => id !== submittedByUserId
-      );
-      const recipients = await filterUsersByPreference(headRoIds, "report-submitted");
-      await notifyUsers(recipients, {
-        type: "report-submitted",
-        title: `${submitter?.name || "A user"} submitted a report for review`,
-        message: data.title,
-        relatedId: reportId,
-        relatedType: "report",
-        actionUrl: "/Head-of-RO/reports",
-      });
-    } catch (error) {
-      logger.error("Failed to notify Head ROs of new report", error);
-    }
+    await notifyReportReviewers(reportId, data.title, submittedByUserId, "submitted");
 
     logger.info(`Report created: ${reportId} by ${submittedByUserId}`);
     return report;
@@ -105,6 +88,103 @@ export async function createReport(
     logger.error("Error creating report", error);
     throw error;
   }
+}
+
+/** Head ROs, and the submitter's SRO (who reviews it), so a new or resubmitted report shows up without polling. */
+async function notifyReportReviewers(
+  reportId: string,
+  reportTitle: string,
+  submittedByUserId: string,
+  verb: "submitted" | "resubmitted"
+) {
+  try {
+    const submitter = await getDocById<User>("users", submittedByUserId);
+    const title = `${submitter?.name || "A user"} ${verb} a report for review`;
+    const headRoIds = (await getUserIdsByRoles(["head-ro", "developer"])).filter((id) => id !== submittedByUserId);
+    const recipients = await filterUsersByPreference(headRoIds, "report-submitted");
+    await notifyUsers(recipients, {
+      type: "report-submitted",
+      title,
+      message: reportTitle,
+      relatedId: reportId,
+      relatedType: "report",
+      actionUrl: "/Head-of-RO/reports",
+    });
+
+    const sroId = submitter ? await findSroAbove(submitter) : null;
+    if (sroId && sroId !== submittedByUserId) {
+      // Review is an action item for the SRO, so it isn't preference-gated.
+      await notifyUsers([sroId], {
+        type: "report-submitted",
+        title,
+        message: reportTitle,
+        relatedId: reportId,
+        relatedType: "report",
+        actionUrl: "/SRO/reports",
+      });
+    }
+  } catch (error) {
+    logger.error(`Failed to notify reviewers of report ${reportId}`, error);
+  }
+}
+
+/**
+ * The submitter fixes a returned (rejected) report and sends it back for
+ * review. The reviewer's earlier feedback is kept as `previousReviewComment`.
+ */
+export async function resubmitReport(
+  reportId: string,
+  data: CreateReportRequest,
+  submittedByUserId: string,
+  actorUserId: string = submittedByUserId
+): Promise<Report> {
+  const report = await getReportById(reportId);
+  if (!report) throw new NotFoundError("Report not found");
+  if (report.submittedBy !== submittedByUserId) throw new AuthorizationError("Only the person who submitted this report can resubmit it");
+  if (report.status !== "rejected") throw new ConflictError("Only a returned report can be edited and resubmitted");
+
+  const saved = await updateDocIfStatus<Report>("reports", reportId, "rejected", {
+    title: data.title,
+    type: data.type,
+    status: "submitted",
+    period: { startDate: new Date(data.period.startDate), endDate: new Date(data.period.endDate) },
+    content: {
+      summary: data.content.summary,
+      achievements: data.content.achievements,
+      challenges: data.content.challenges,
+      metrics: data.content.metrics,
+      ...(data.content.attachments?.length ? { attachments: data.content.attachments } : {}),
+    },
+    submittedAt: new Date(),
+    previousReviewComment: report.reviewComment,
+    // null removes the field: the new version hasn't been reviewed yet.
+    reviewComment: null,
+    reviewedBy: null,
+    reviewedAt: null,
+  } as unknown as Partial<Report>);
+  if (!saved) throw new ConflictError(`"${report.title}" was just changed — refresh and try again`);
+
+  await createActivityLog({
+    userId: actorUserId,
+    action: "report-submitted",
+    description: `Resubmitted report "${data.title}"${actorUserId !== submittedByUserId ? ` on behalf of ${submittedByUserId}` : ""}`,
+    entityType: "report",
+    entityId: reportId,
+    changes: { status: { oldValue: "rejected", newValue: "submitted" } },
+  });
+  await notifyReportReviewers(reportId, data.title, submittedByUserId, "resubmitted");
+
+  return (await getReportById(reportId))!;
+}
+
+/** The SRO the user reports to, directly or through their RO / youth leader. */
+async function findSroAbove(user: User): Promise<string | null> {
+  let current: User | null = user;
+  for (let depth = 0; depth < 4 && current && "reportingToId" in current && current.reportingToId; depth++) {
+    current = await getDocById<User>("users", current.reportingToId);
+    if (current?.role === "sro") return current.id;
+  }
+  return null;
 }
 
 /** The submitter, Head RO / developer, or anyone above the submitter in their reporting chain. */
@@ -217,12 +297,13 @@ export async function updateReportStatus(
       );
     }
 
-    await updateDoc<Report>("reports", reportId, {
+    const saved = await updateDocIfStatus<Report>("reports", reportId, report.status, {
       status,
       reviewedBy: reviewedByUserId,
       reviewedAt: new Date(),
       reviewComment: reviewComment || undefined,
     });
+    if (!saved) throw new ConflictError(`"${report.title}" was already reviewed — refresh to see it`);
 
     await createActivityLog({
       userId: reviewedByUserId,
