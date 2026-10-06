@@ -72,7 +72,7 @@ export function ActivityDetailModal({ activityId, scope, onClose }: ActivityDeta
     try {
       await openEvidencePdf(activity.id, index, scope);
     } catch (err) {
-      setPdfError(errorMessage(err, "Couldn't open this PDF."));
+      setPdfError(errorMessage(err, "Couldn't open this file."));
     }
   };
 

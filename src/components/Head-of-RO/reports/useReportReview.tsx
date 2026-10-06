@@ -8,8 +8,8 @@ type Decision = "approved" | "rejected";
 type PendingReview = { id: string; title: string; decision: Decision } | null;
 
 /**
- * Approve/reject flow shared by the Reports page and the dashboard: always
- * confirms, lets the reviewer leave feedback, and requires a reason to reject.
+ * Approve / ask-for-changes flow shared by the Reports pages and the dashboard:
+ * always confirms, lets the reviewer leave feedback, and requires it when asking for changes.
  */
 export function useReportReview(onReviewed: (reportId: string, decision: Decision) => void) {
   const [pending, setPending] = useState<PendingReview>(null);
@@ -44,18 +44,18 @@ export function useReportReview(onReviewed: (reportId: string, decision: Decisio
   const dialog = (
     <ConfirmDialog
       isOpen={!!pending}
-      title={isReject ? "Reject report?" : "Approve report?"}
+      title={isReject ? "Ask for changes?" : "Approve report?"}
       message={
         <>
           <span className="font-medium text-gray-800">&ldquo;{pending?.title}&rdquo;</span>
-          {isReject ? " will be sent back to the submitter with your reason." : " will be marked approved and the submitter notified."}
+          {isReject ? " goes back to the submitter to edit and resubmit." : " will be marked approved and the submitter notified."}
         </>
       }
-      confirmLabel={isReject ? "Reject" : "Approve"}
+      confirmLabel={isReject ? "Ask for changes" : "Approve"}
       tone={isReject ? "danger" : "primary"}
       comment={
         isReject
-          ? { label: "Reason for rejecting", placeholder: "What needs to change?", required: true, minLength: 3 }
+          ? { label: "What needs to change", placeholder: "Tell them what to fix", required: true, minLength: 3 }
           : { label: "Feedback (optional)", placeholder: "Anything the submitter should know?" }
       }
       isBusy={isBusy}

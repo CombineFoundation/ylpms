@@ -1,12 +1,14 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useDeepLinkId } from "@/hooks/useDeepLinkId";
 import { Download } from "lucide-react";
 import { getAuthToken, errorMessage } from "@/lib/api-client";
 import { useLoadAllWhileSearching, usePagedList } from "@/hooks/usePagedList";
 import { ReportsTable } from "./ReportsTable";
 import { ReportDetailModal } from "./ReportDetailModal";
 import { useReportReview } from "./useReportReview";
+import { useCurrentProfile } from "@/hooks/useCurrentProfile";
 import {
   REPORT_STATUS_FILTERS,
   toDisplayReport,
@@ -22,12 +24,25 @@ export function ReportList() {
     `reports:${statusFilter}`,
     "Unable to load reports."
   );
-  const reports = useMemo(() => list.items.map(toDisplayReport), [list.items]);
+  const { profile } = useCurrentProfile();
+  const viewer = profile ? { userId: profile.id, role: profile.role } : null;
+  // Head RO reviews SROs' reports (and anyone without a manager); the rest go to their own manager.
+  const reports = useMemo(
+    () => list.items.map((report) => toDisplayReport(report, profile ? { userId: profile.id, role: profile.role } : null)),
+    [list.items, profile]
+  );
 
   const [search, setSearch] = useState("");
   // Search runs on the client, so fetch the remaining pages while searching.
   useLoadAllWhileSearching(list, search);
   const [viewingId, setViewingId] = useState<string | null>(null);
+  // A notification's link (?reportId=) opens that report.
+  const [linkedReportId, consumeLinkedReport] = useDeepLinkId("reportId");
+  useEffect(() => {
+    if (!linkedReportId) return;
+    setViewingId(linkedReportId);
+    consumeLinkedReport();
+  }, [linkedReportId, consumeLinkedReport]);
   const [actionError, setActionError] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
 
@@ -119,6 +134,7 @@ export function ReportList() {
 
       <ReportDetailModal
         reportId={viewingId}
+        viewer={viewer}
         onClose={() => setViewingId(null)}
         onReview={(report, decision) => {
           setViewingId(null);

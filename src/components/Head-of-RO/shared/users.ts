@@ -1,3 +1,4 @@
+import { ALL_PAKISTAN_CITIES } from "@/config/pakistan-cities";
 import { formatJoinedDate, getEffectiveStatus, type DisplayStatus, type TimestampInput } from "@/utils/user-status";
 import type { UserRole, UserStatus } from "@/types/user.types";
 
@@ -79,6 +80,18 @@ export const STATUS_FILTER_OPTIONS = [
 export type StatusFilter = (typeof STATUS_FILTER_OPTIONS)[number]["value"];
 
 /** Unique non-empty region labels, for a region filter. */
-export function regionOptions(rows: UserRow[]) {
-  return [...new Set(rows.map((row) => row.regionLabel))].sort((a, b) => a.localeCompare(b));
+/** The search box and status/region filters on the member list screens (also used by their CSV export). */
+export function matchesFilters(row: UserRow, filters: { query: string; statusFilter: StatusFilter; regionFilter: string }) {
+  return (
+    matchesQuery(row, filters.query) &&
+    (filters.statusFilter === "All" || row.status === filters.statusFilter) &&
+    (!filters.regionFilter || row.regionLabel === filters.regionFilter)
+  );
+}
+
+/** Regions in the loaded rows; with `allCities` (youth leaders, volunteers), every Pakistani city too. */
+export function regionOptions(rows: UserRow[], allCities = false) {
+  return [...new Set([...rows.map((row) => row.regionLabel), ...(allCities ? ALL_PAKISTAN_CITIES : [])])].sort((a, b) =>
+    a.localeCompare(b)
+  );
 }

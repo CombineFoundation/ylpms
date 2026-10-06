@@ -14,6 +14,7 @@ type RoTableProps = {
   onEdit: (ro: Ro) => void;
   onDelete: (ro: Ro) => void;
   onStatusChange: (ro: Ro, status: UserStatus) => void;
+  onSendReset: (ro: Ro) => void;
 };
 
 export function RoTable({
@@ -27,6 +28,7 @@ export function RoTable({
   onEdit,
   onDelete,
   onStatusChange,
+  onSendReset,
 }: RoTableProps) {
   return (
     <div className="overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm">
@@ -51,7 +53,14 @@ export function RoTable({
             {!isLoading &&
               !error &&
               ros.map((ro) => (
-                <RoTableRow key={ro.id} ro={ro} onEdit={onEdit} onDelete={onDelete} onStatusChange={onStatusChange} />
+                <RoTableRow
+                  key={ro.id}
+                  ro={ro}
+                  onEdit={onEdit}
+                  onDelete={onDelete}
+                  onStatusChange={onStatusChange}
+                  onSendReset={onSendReset}
+                />
               ))}
 
             {!isLoading && !error && ros.length === 0 && <TableMessageRow colSpan={6} message={emptyMessage} />}

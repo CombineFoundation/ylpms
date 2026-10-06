@@ -26,7 +26,7 @@ type TaskSubmissionModalProps = {
   onReviewed?: () => void;
 };
 
-/** What the assignee handed in for a task (note and PDFs), the reviewer's feedback, and review actions. */
+/** What the assignee handed in for a task (note and files), the reviewer's feedback, and review actions. */
 export function TaskSubmissionModal({ task, canReview = false, onClose, onReviewed }: TaskSubmissionModalProps) {
   const [pdfError, setPdfError] = useState<string | null>(null);
   const [isRequestingChanges, setIsRequestingChanges] = useState(false);
@@ -47,7 +47,7 @@ export function TaskSubmissionModal({ task, canReview = false, onClose, onReview
     try {
       await openAuthenticatedPdf(`/api/tasks/${task.id}/attachments/${index}`);
     } catch (err) {
-      setPdfError(errorMessage(err, "Couldn't open this PDF."));
+      setPdfError(errorMessage(err, "Couldn't open this file."));
     }
   };
 

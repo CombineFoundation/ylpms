@@ -2,10 +2,10 @@
 
 import { ApiError, apiFetch } from "@/lib/api-client";
 import { SCOPE_PARAM, type ScopedRole } from "@/utils/portal-scope";
+import { MAX_ATTACHMENT_BYTES, attachmentKindFor } from "@/utils/attachment-types";
 import type { ReportAttachment } from "@/types/report.types";
 
-export const MAX_REPORT_PDF_BYTES = 10 * 1024 * 1024;
-export const MAX_REPORT_ATTACHMENTS = 5;
+export { ATTACHMENT_ACCEPT, MAX_ATTACHMENTS } from "@/utils/attachment-types";
 
 export function formatFileSize(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
@@ -13,11 +13,10 @@ export function formatFileSize(bytes: number) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-/** Client-side check before uploading; the server re-checks (including the real PDF signature). */
-export function pdfFileError(file: File): string | null {
-  const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
-  if (!isPdf) return `"${file.name}" isn't a PDF`;
-  if (file.size > MAX_REPORT_PDF_BYTES) return `"${file.name}" is larger than 10 MB`;
+/** Client-side check before uploading; the server re-checks (including the file's real signature). */
+export function attachmentFileError(file: File): string | null {
+  if (!attachmentKindFor(file.name)) return `"${file.name}" isn't a PDF or an image (JPG, PNG, WEBP)`;
+  if (file.size > MAX_ATTACHMENT_BYTES) return `"${file.name}" is larger than 10 MB`;
   if (file.size === 0) return `"${file.name}" is empty`;
   return null;
 }
@@ -42,7 +41,7 @@ export async function uploadDirect<T>(file: File, apiPath: string, query = ""): 
 }
 
 /**
- * Uploads one PDF (for a report, a task submission or an activity's evidence);
+ * Uploads one PDF or image (for a report, a task submission or an activity's evidence);
  * `actingAs` is set when a developer is acting as that portal's user.
  */
 export function uploadReportPdf(
@@ -53,12 +52,12 @@ export function uploadReportPdf(
   return uploadDirect<ReportAttachment>(file, "/api/reports/attachments", query);
 }
 
-/** Opens an attached report PDF in a new tab. */
+/** Opens a report's attachment in a new tab. */
 export function openReportAttachment(reportId: string, index: number) {
   return openAuthenticatedPdf(`/api/reports/${reportId}/attachments/${index}`);
 }
 
-/** Opens a PDF served by our API in a new tab. */
+/** Opens an attachment (PDF or image) whose link our API gives, in a new tab. */
 export function openAuthenticatedPdf(path: string) {
   return openAuthenticatedFile(path);
 }

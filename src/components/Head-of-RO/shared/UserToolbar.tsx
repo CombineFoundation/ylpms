@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Filter, Plus } from "lucide-react";
+import { Download, Filter, Plus } from "lucide-react";
+import { errorMessage } from "@/lib/api-client";
 import { FilterPills, SearchInput } from "./ListParts";
 import { STATUS_FILTER_OPTIONS, type StatusFilter } from "./users";
 
@@ -20,6 +21,8 @@ type UserToolbarProps = {
   unassignedOnly?: { value: boolean; onChange: (value: boolean) => void; label: string };
   addLabel?: string;
   onAdd?: () => void;
+  /** Downloads the matching rows as CSV; resolves to how many were exported. */
+  onExport?: () => Promise<number>;
 };
 
 /** Search + status/region filters (+ optional add button) for the user list screens. */
@@ -36,8 +39,24 @@ export function UserToolbar({
   unassignedOnly,
   addLabel = "Add New",
   onAdd,
+  onExport,
 }: UserToolbarProps) {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
+
+  const runExport = async () => {
+    if (!onExport) return;
+    setIsExporting(true);
+    setExportError(null);
+    try {
+      if ((await onExport()) === 0) setExportError("Nothing matches the current search and filters.");
+    } catch (error) {
+      setExportError(errorMessage(error, "Couldn't export. Please try again."));
+    } finally {
+      setIsExporting(false);
+    }
+  };
   const activeFilters =
     (statusFilter !== "All" ? 1 : 0) + (regionFilter ? 1 : 0) + (unassignedOnly?.value ? 1 : 0);
 
@@ -54,6 +73,17 @@ export function UserToolbar({
           <Filter className="h-4 w-4" />
           Filter{activeFilters > 0 ? ` (${activeFilters})` : ""}
         </button>
+        {onExport && (
+          <button
+            type="button"
+            onClick={runExport}
+            disabled={isExporting}
+            className="flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50 disabled:opacity-60"
+          >
+            <Download className="h-4 w-4" />
+            {isExporting ? "Exporting…" : "Export CSV"}
+          </button>
+        )}
         {onAdd && (
           <button
             type="button"
@@ -65,6 +95,12 @@ export function UserToolbar({
           </button>
         )}
       </div>
+
+      {exportError && (
+        <p role="alert" className="text-sm text-red-500">
+          {exportError}
+        </p>
+      )}
 
       {isFilterOpen && (
         <div className="space-y-3 rounded-lg border border-gray-100 bg-white p-4">

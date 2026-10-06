@@ -1,13 +1,12 @@
 "use client";
 
-import { useState } from "react";
-import { Calendar, Download, MapPin } from "lucide-react";
+import { Calendar, MapPin } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
-import { formatCertificateDate, kindLabels, printCertificate, roleLabels, type ApiTeamCertificateGroup } from "./certificate.types";
+import { formatCertificateDate, kindLabels, roleLabels, type ApiTeamCertificateGroup } from "./certificate.types";
+import { CertificateActions } from "./CertificateActions";
 
 /** Everyone certified for one activity: the organizer's certificate first, then each volunteer's. */
 export function TeamCertificateDetailModal({ group, onClose }: { group: ApiTeamCertificateGroup | null; onClose: () => void }) {
-  const [popupBlocked, setPopupBlocked] = useState(false);
   const participants = group?.certificates.filter((c) => c.kind === "participation") ?? [];
   const organizers = group?.certificates.filter((c) => c.kind === "organizer") ?? [];
 
@@ -26,12 +25,6 @@ export function TeamCertificateDetailModal({ group, onClose }: { group: ApiTeamC
             </span>
             <span>Verified by {group.issuedByName}</span>
           </div>
-
-          {popupBlocked && (
-            <p role="alert" className="text-sm text-red-500">
-              Your browser blocked the certificate window. Allow pop-ups for this site and try again.
-            </p>
-          )}
 
           {[
             { title: "Organizer", list: organizers, empty: "No organizer certificate in your team for this activity." },
@@ -52,14 +45,7 @@ export function TeamCertificateDetailModal({ group, onClose }: { group: ApiTeamC
                           {certificate.certificateNumber}
                         </p>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => setPopupBlocked(!printCertificate(certificate))}
-                        className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:border-brand hover:text-brand"
-                      >
-                        <Download className="h-3.5 w-3.5" />
-                        View / PDF
-                      </button>
+                      <CertificateActions certificate={certificate} />
                     </li>
                   ))}
                 </ul>

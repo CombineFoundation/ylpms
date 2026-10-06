@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useDeepLinkId } from "@/hooks/useDeepLinkId";
 import { Plus } from "lucide-react";
 import { apiFetch, errorMessage } from "@/lib/api-client";
 import { uploadReportPdf } from "@/lib/report-attachments";
@@ -18,18 +19,19 @@ type Tab = "team" | "mine";
 /** Portals whose users submit reports (volunteers don't). */
 export type ReportingRole = Exclude<ScopedRole, "volunteer">;
 
-const reviewerFor: Record<ReportingRole, string> = { sro: "Head RO", ro: "SRO", "youth-leader": "SRO" };
+// Each report goes to the submitter's direct manager (utils/report-review.ts).
+const reviewerFor: Record<ReportingRole, string> = { sro: "Head RO", ro: "SRO", "youth-leader": "RO" };
 /** null: the role has no team reports to show (volunteers don't submit reports). */
 const teamCopy: Record<ReportingRole, string | null> = {
   sro: "Review your team's reports",
-  ro: "See your youth leaders' reports",
+  ro: "Review your youth leaders' reports",
   "youth-leader": null,
 };
 
 /**
- * Reports for a manager: their team's (an SRO reviews them; an RO sees them
- * view-only) and their own, submitted to their reviewer (SRO → Head RO, RO /
- * youth leader → SRO). A youth leader only has their own.
+ * Reports for a manager: their team's (each reviewed by the submitter's direct
+ * manager) and their own, submitted to their reviewer (SRO → Head RO, RO → SRO,
+ * youth leader → RO). A youth leader only has their own.
  */
 export function TeamReportList({ portal }: { portal: ReportingRole }) {
   const reviewer = reviewerFor[portal];
@@ -39,6 +41,16 @@ export function TeamReportList({ portal }: { portal: ReportingRole }) {
   // GET /api/reports returns only the caller's own reports (or the chosen SRO's/RO's, for a developer).
   const mine = usePortalData<ApiReport[]>(portal, "/api/reports?pageSize=100", "Unable to load your reports.");
   const myReports = useMemo(() => mine.data ?? [], [mine.data]);
+
+  // A notification's link (?reportId=) opens that report, on whichever tab it's in.
+  const [linkedReportId, consumeLinkedReport] = useDeepLinkId("reportId");
+  const [openReportId, setOpenReportId] = useState<string | null>(null);
+  useEffect(() => {
+    if (!linkedReportId || mine.isLoading) return;
+    setTab(hasTeam && !myReports.some((report) => report.id === linkedReportId) ? "team" : "mine");
+    setOpenReportId(linkedReportId);
+    consumeLinkedReport();
+  }, [linkedReportId, mine.isLoading, myReports, hasTeam, consumeLinkedReport]);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   /** A returned report being edited and resubmitted (null: a new report). */
@@ -59,7 +71,7 @@ export function TeamReportList({ portal }: { portal: ReportingRole }) {
     try {
       const attachments = [...kept];
       for (const [index, file] of files.entries()) {
-        setProgress(`Uploading PDF ${index + 1} of ${files.length}...`);
+        setProgress(`Uploading file ${index + 1} of ${files.length}...`);
         attachments.push(await uploadReportPdf(file, selectedId ? { role: portal, id: selectedId } : null));
       }
       setProgress(files.length ? "Submitting report..." : null);
@@ -112,7 +124,7 @@ export function TeamReportList({ portal }: { portal: ReportingRole }) {
       {hasTeam && <FilterPills label="View" options={tabs} value={tab} onChange={setTab} />}
 
       {tab === "team" && portal !== "youth-leader" ? (
-        <TeamReports portal={portal} />
+        <TeamReports portal={portal} openReportId={openReportId} />
       ) : (
         <div className="overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm">
           <MyReports
@@ -120,6 +132,7 @@ export function TeamReportList({ portal }: { portal: ReportingRole }) {
             isLoading={mine.isLoading}
             error={mine.error}
             reviewer={reviewer}
+            openReportId={openReportId}
             onResubmit={(report) => {
               setFormError(null);
               setEditing(report);

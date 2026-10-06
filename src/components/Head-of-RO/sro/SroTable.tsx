@@ -17,6 +17,7 @@ type SroTableProps = {
   onEdit: (sro: Sro) => void;
   onDelete: (sro: Sro) => void;
   onStatusChange: (sro: Sro, status: UserStatus) => void;
+  onSendReset: (sro: Sro) => void;
   onManageROs: (sro: Sro) => void;
 };
 
@@ -31,6 +32,7 @@ export function SroTable({
   onEdit,
   onDelete,
   onStatusChange,
+  onSendReset,
   onManageROs,
 }: SroTableProps) {
   return (
@@ -89,7 +91,13 @@ export function SroTable({
                       >
                         Manage ROs
                       </button>
-                      <UserRowActions user={sro} onEdit={onEdit} onDelete={onDelete} onStatusChange={onStatusChange} />
+                      <UserRowActions
+                        user={sro}
+                        onEdit={onEdit}
+                        onDelete={onDelete}
+                        onStatusChange={onStatusChange}
+                        onSendReset={onSendReset}
+                      />
                     </div>
                   </td>
                 </tr>

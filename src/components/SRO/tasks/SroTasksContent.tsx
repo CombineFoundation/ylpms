@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useDeepLinkId } from "@/hooks/useDeepLinkId";
 import { Plus } from "lucide-react";
 import { apiFetch, errorMessage } from "@/lib/api-client";
 import { scopedPath, usePortalData, usePortalScope, type ScopedRole } from "@/hooks/usePortalScope";
@@ -16,6 +17,8 @@ import type { TaskStatus } from "@/types/task.types";
 import { SroTaskTable } from "./SroTaskTable";
 import { SroTaskFormModal } from "./SroTaskFormModal";
 import { TaskSubmitModal } from "@/components/shared/tasks/TaskSubmitModal";
+import { TaskDetailModal } from "@/components/shared/tasks/TaskDetailModal";
+import { MyTaskCards } from "./MyTaskCards";
 import { MonthlyTaskButton } from "@/components/shared/tasks/MonthlyTaskButton";
 import { TaskSubmissionModal } from "@/components/shared/tasks/TaskSubmissionModal";
 import { saveSroTask } from "./sro-task.api";
@@ -68,6 +71,30 @@ export function TeamTasksContent({ portal }: { portal: ScopedRole }) {
   const [isDeleting, setIsDeleting] = useState(false);
   const [submittingTask, setSubmittingTask] = useState<SroTaskRow | null>(null);
   const [viewingSubmission, setViewingSubmission] = useState<SroTaskRow | null>(null);
+  /** The task whose details are open, and which list it was opened from. */
+  const [openTask, setOpenTask] = useState<{ task: SroTaskRow; mode: "mine" | "team" | "view" } | null>(null);
+
+  // A notification's link (?taskId=) opens that task once the lists have loaded.
+  const [linkedTaskId, consumeLinkedTask] = useDeepLinkId("taskId");
+  useEffect(() => {
+    if (!linkedTaskId || !data) return;
+    const lists = [
+      ["mine", data.assignedToMe],
+      ["team", data.assignedByMe],
+      ["view", data.teamMonthly ?? []],
+    ] as const;
+    for (const [mode, list] of lists) {
+      const task = list.find((t) => t.id === linkedTaskId);
+      if (task) {
+        const row = toSroTaskRow(task);
+        // Work waiting for this person's review opens straight on the submission.
+        if (mode === "team" && row.status === "submitted") setViewingSubmission(row);
+        else setOpenTask({ task: row, mode });
+        break;
+      }
+    }
+    consumeLinkedTask();
+  }, [linkedTaskId, data, consumeLinkedTask]);
 
   useEffect(() => {
     // The dashboard's "Assign Task" button links here with ?new=1.
@@ -157,7 +184,9 @@ export function TeamTasksContent({ portal }: { portal: ScopedRole }) {
     }
   };
 
-  const isFiltered = !!query.trim() || view !== "all";
+  // "Nothing matches your filters" only when the list has tasks the search/filter hid;
+  // an empty list says so plainly (the default "Open" filter alone isn't the user's doing).
+  const filteredOut = (all?: unknown[]) => (all?.length ?? 0) > 0;
 
   return (
     <div className="space-y-6">
@@ -212,18 +241,31 @@ export function TeamTasksContent({ portal }: { portal: ScopedRole }) {
         <h2 className="border-b border-gray-100 px-5 py-4 text-sm font-semibold text-gray-700">
           Assigned to me {data && <span className="font-normal text-gray-400">({myTasks.length})</span>}
         </h2>
-        <SroTaskTable
-          mode="mine"
+        <MyTaskCards
+          className="sm:hidden"
           tasks={myTasks}
           isLoading={isLoading}
           error={loadError}
-          emptyMessage={emptyMessage({ isFiltered, noun: "tasks assigned to you" })}
+          emptyMessage={emptyMessage({ isFiltered: filteredOut(data?.assignedToMe), noun: "tasks assigned to you" })}
           updatingId={updatingId}
-          onStatusChange={handleStatusChange}
+          onOpen={(task) => setOpenTask({ task, mode: "mine" })}
           onSubmit={setSubmittingTask}
-          onViewSubmission={setViewingSubmission}
-          onWithdraw={handleWithdraw}
         />
+        <div className="hidden sm:block">
+          <SroTaskTable
+            mode="mine"
+            tasks={myTasks}
+            isLoading={isLoading}
+            error={loadError}
+            emptyMessage={emptyMessage({ isFiltered: filteredOut(data?.assignedToMe), noun: "tasks assigned to you" })}
+            updatingId={updatingId}
+            onStatusChange={handleStatusChange}
+            onSubmit={setSubmittingTask}
+            onViewSubmission={setViewingSubmission}
+            onWithdraw={handleWithdraw}
+            onOpen={(task) => setOpenTask({ task, mode: "mine" })}
+          />
+        </div>
       </section>
 
       {canAssign && (
@@ -236,7 +278,7 @@ export function TeamTasksContent({ portal }: { portal: ScopedRole }) {
             tasks={teamTasks}
             isLoading={isLoading}
             error={loadError}
-            emptyMessage={emptyMessage({ isFiltered, noun: "team tasks", emptyHint: "Assign the first one." })}
+            emptyMessage={emptyMessage({ isFiltered: filteredOut(data?.assignedByMe), noun: "team tasks", emptyHint: "Assign the first one." })}
             updatingId={updatingId}
             onStatusChange={handleStatusChange}
             onEdit={(task) => {
@@ -246,6 +288,7 @@ export function TeamTasksContent({ portal }: { portal: ScopedRole }) {
             }}
             onDelete={setDeletingTask}
             onViewSubmission={setViewingSubmission}
+            onOpen={(task) => setOpenTask({ task, mode: "team" })}
           />
         </section>
       )}
@@ -263,14 +306,23 @@ export function TeamTasksContent({ portal }: { portal: ScopedRole }) {
             tasks={monthlyTasks}
             isLoading={isLoading}
             error={loadError}
-            emptyMessage={emptyMessage({ isFiltered, noun: "monthly tasks" })}
+            emptyMessage={emptyMessage({ isFiltered: filteredOut(data?.teamMonthly), noun: "monthly tasks" })}
             updatingId={null}
             onStatusChange={() => {}}
             onViewSubmission={setViewingSubmission}
+            onOpen={(task) => setOpenTask({ task, mode: "view" })}
           />
         </section>
       )}
 
+      <TaskDetailModal
+        task={openTask?.task ?? null}
+        mode={openTask?.mode ?? "mine"}
+        onClose={() => setOpenTask(null)}
+        onSubmit={setSubmittingTask}
+        onWithdraw={handleWithdraw}
+        onViewSubmission={setViewingSubmission}
+      />
       <TaskSubmitModal
         task={submittingTask}
         portal={portal}

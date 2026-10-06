@@ -1,6 +1,7 @@
 import type { ReportAttachment, ReportStatus, ReportType } from "@/types/report.types";
 import type { MemberProfile, UserRole } from "@/types/user.types";
 import { formatDate } from "@/utils/format-date";
+import { canReviewReport } from "@/utils/report-review";
 import { timestampToDate, type TimestampInput } from "@/utils/user-status";
 
 export type ApiReport = {
@@ -12,6 +13,8 @@ export type ApiReport = {
   submittedByName?: string;
   submittedByRegion?: string;
   submittedByRole?: UserRole;
+  /** The submitter's manager, who reviews it (see utils/report-review.ts). */
+  submittedByManagerId?: string;
   /** GET /api/reports/[reportId] only: the submitter's details and reporting chain. */
   submitterProfile?: MemberProfile;
   createdAt?: TimestampInput;
@@ -36,9 +39,21 @@ export type DisplayReport = {
   region: string;
   date: string;
   status: ReportStatus;
+  /** Whether the viewer is this report's reviewer. */
+  canReview: boolean;
 };
 
-export function toDisplayReport(report: ApiReport): DisplayReport {
+export type ReportViewer = { userId: string; role: UserRole } | null;
+
+/** Whether `viewer` reviews this report (the submitter's direct manager; see utils/report-review.ts). */
+export function viewerCanReview(report: ApiReport, viewer: ReportViewer): boolean {
+  return (
+    !!viewer &&
+    canReviewReport(viewer, { id: report.submittedBy, role: report.submittedByRole, managerId: report.submittedByManagerId })
+  );
+}
+
+export function toDisplayReport(report: ApiReport, viewer: ReportViewer = null): DisplayReport {
   return {
     id: report.id,
     title: report.title,
@@ -46,15 +61,16 @@ export function toDisplayReport(report: ApiReport): DisplayReport {
     region: report.submittedByRegion || "Unassigned",
     date: formatReportDate(report.createdAt),
     status: report.status,
+    canReview: viewerCanReview(report, viewer),
   };
 }
 
 export const statusLabels: Record<ReportStatus, string> = {
   draft: "Draft",
   submitted: "Pending",
-  reviewed: "Reviewed",
+  reviewed: "Under review",
   approved: "Approved",
-  rejected: "Rejected",
+  rejected: "Changes requested",
 };
 
 export const statusStyles: Record<ReportStatus, string> = {
@@ -76,15 +92,14 @@ export const reportTypeLabels: Record<ReportType, string> = {
 
 export const REPORT_STATUS_FILTERS = [
   { value: "submitted", label: "Pending" },
-  { value: "reviewed", label: "Reviewed" },
   { value: "approved", label: "Approved" },
-  { value: "rejected", label: "Rejected" },
+  { value: "rejected", label: "Changes requested" },
   { value: "", label: "All" },
 ] as const;
 
 export type ReportStatusFilter = (typeof REPORT_STATUS_FILTERS)[number]["value"];
 
-/** Reports awaiting a decision (the reviewer can approve/reject these). */
+/** Reports awaiting a decision (the reviewer approves them or asks for changes). */
 export function isReviewable(status: ReportStatus) {
   return status === "submitted" || status === "reviewed";
 }

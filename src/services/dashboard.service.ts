@@ -17,6 +17,8 @@ import { formatDate } from "@/utils/format-date";
 
 const GROWTH_MONTHS = 7;
 const PENDING_REPORTS_SHOWN = 5;
+/** Submitted reports scanned for the ones awaiting Head RO (SROs' reports). */
+const PENDING_REVIEW_SCAN = 500;
 const UPCOMING_TASKS_SHOWN = 5;
 
 export interface RoleCount {
@@ -347,7 +349,12 @@ async function getTeamDashboardSummary(sroId: string, leadRole: UserRole): Promi
         leads: ros.length,
         youthLeaders: team.filter((node) => node.role === "youth-leader").length,
         volunteers: team.filter((node) => node.role === "volunteer").length,
-        pendingReports: teamReports.filter((report) => report.status === "submitted").length,
+        // Reports this manager reviews: their direct reports' (a youth leader: their own, awaiting their RO).
+        pendingReports: teamReports.filter(
+          (report) =>
+            report.status === "submitted" &&
+            (leadRole === "volunteer" || tree.nodes[report.submittedBy ?? ""]?.parentId === sroId)
+        ).length,
         activeTasks: taskOverview.pending + taskOverview.inProgress + taskOverview.overdue,
         overdueTasks: taskOverview.overdue,
       },
@@ -530,7 +537,6 @@ export async function getHeadRODashboardSummary(viewerId: string): Promise<HeadR
       growth,
       volunteerRegions,
       pendingReportsPage,
-      pendingReportCount,
       upcomingTasksPage,
       overdueTaskCount,
       activities,
@@ -544,8 +550,7 @@ export async function getHeadRODashboardSummary(viewerId: string): Promise<HeadR
       volunteerGrowth(),
       // Only the region field — not whole volunteer documents.
       selectFields<{ region?: string }>("users", [{ field: "role", operator: "==", value: "volunteer" }], ["region"]),
-      getReports({ status: "submitted", pageSize: PENDING_REPORTS_SHOWN, pageNumber: 1 }),
-      getDocCount("reports", [{ field: "status", operator: "==", value: "submitted" }]),
+      getReports({ status: "submitted", pageSize: PENDING_REVIEW_SCAN, pageNumber: 1 }),
       // Still-open tasks that aren't past due yet, soonest first.
       getTasks({ status: "open", dueAfter: now, pageSize: UPCOMING_TASKS_SHOWN, pageNumber: 1 }),
       getDocCount("tasks", [
@@ -557,12 +562,19 @@ export async function getHeadRODashboardSummary(viewerId: string): Promise<HeadR
       getUnreadNotificationCount(viewerId),
     ]);
 
-    const [pendingReports, upcomingTasks, activitySummary] = await Promise.all([
+    const [submittedReports, upcomingTasks, activitySummary] = await Promise.all([
       enrichReportsForList(pendingReportsPage.items),
       enrichTasksForList(upcomingTasksPage.items),
       // Head RO can review every youth leader's activity.
       summarizeActivities(activities, () => true),
     ]);
+
+    // Head RO reviews SROs' reports (and anyone's without a manager); the rest go to their own manager.
+    const awaitingHeadRo = submittedReports.filter(
+      (report) => !report.submittedByManagerId || report.submittedByRole === "sro"
+    );
+    const pendingReportCount = awaitingHeadRo.length;
+    const pendingReports = awaitingHeadRo.slice(0, PENDING_REPORTS_SHOWN);
 
     return {
       stats: { sro, ro, "youth-leader": youthLeader, volunteer },

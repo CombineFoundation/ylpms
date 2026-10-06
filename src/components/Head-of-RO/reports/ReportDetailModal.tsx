@@ -11,7 +11,9 @@ import {
   reportTypeLabels,
   statusLabels,
   statusStyles,
+  viewerCanReview,
   type ApiReport,
+  type ReportViewer,
 } from "./report-display.types";
 
 type ReportDetailModalProps = {
@@ -19,10 +21,12 @@ type ReportDetailModalProps = {
   onClose: () => void;
   /** Omit for a read-only view (e.g. the submitter looking at their own report). */
   onReview?: (report: { id: string; title: string }, decision: "approved" | "rejected") => void;
+  /** Who is looking: the review buttons only show for the report's reviewer. */
+  viewer?: ReportViewer;
 };
 
 /** Full report content, so the reviewer can read it before approving or rejecting. */
-export function ReportDetailModal({ reportId, onClose, onReview }: ReportDetailModalProps) {
+export function ReportDetailModal({ reportId, onClose, onReview, viewer = null }: ReportDetailModalProps) {
   const [report, setReport] = useState<ApiReport | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -108,7 +112,7 @@ export function ReportDetailModal({ reportId, onClose, onReview }: ReportDetailM
 
           {report.reviewComment && (
             <section className="rounded-lg border border-gray-100 bg-gray-50 p-3">
-              <h3 className="mb-1 text-xs font-semibold text-gray-500">Reviewer comment</h3>
+              <h3 className="mb-1 text-xs font-semibold text-gray-500">Reviewer feedback</h3>
               <p className="text-gray-700">{report.reviewComment}</p>
             </section>
           )}
@@ -120,14 +124,14 @@ export function ReportDetailModal({ reportId, onClose, onReview }: ReportDetailM
             </section>
           )}
 
-          {onReview && isReviewable(report.status) && (
+          {onReview && isReviewable(report.status) && viewerCanReview(report, viewer) && (
             <div className="flex justify-end gap-2 border-t border-gray-100 pt-4">
               <button
                 type="button"
                 onClick={() => onReview?.(report, "rejected")}
                 className="rounded-lg border border-red-200 px-4 py-2 text-sm font-semibold text-red-500 hover:bg-red-50"
               >
-                Reject
+                Ask for changes
               </button>
               <button
                 type="button"

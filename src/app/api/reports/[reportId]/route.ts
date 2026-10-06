@@ -7,10 +7,10 @@ import {
   deleteReport,
   enrichReportsForList,
   resubmitReport,
+  requireReportReviewer,
 } from "@/services/report.service";
 import { requireOwnAttachments } from "@/services/report-attachment.service";
 import { getMemberProfiles } from "@/services/team.service";
-import { isInManagerChain } from "@/utils/authorization";
 import { resolveActingAs } from "@/utils/sro-scope";
 import { AuthenticationError, AuthorizationError, NotFoundError } from "@/utils/errors";
 import { createReportSchema, updateReportStatusSchema } from "@/utils/validation";
@@ -46,8 +46,9 @@ export async function GET(req: NextRequest, { params }: Params) {
 }
 
 /**
- * PATCH /api/reports/[reportId] - Review a report (approve/reject/mark reviewed)
- * Body: { status, reviewComment? }  (a comment is required when rejecting)
+ * PATCH /api/reports/[reportId] - The submitter's reviewer (their direct manager; see
+ * utils/report-review.ts) approves the report or asks for changes.
+ * Body: { status: "approved" | "rejected", reviewComment? }  (a comment is required to ask for changes)
  */
 export async function PATCH(req: NextRequest, { params }: Params) {
   const { reportId } = await params;
@@ -55,16 +56,9 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     try {
       if (!authReq.user) throw new AuthenticationError();
 
-      // Head RO reviews any report; an SRO only reports from their own team.
-      const { role, userId } = authReq.user;
-      if (role !== "head-ro" && role !== "developer") {
-        if (role !== "sro") throw new AuthorizationError();
-        const existing = await getReportById(reportId);
-        if (!existing) throw new NotFoundError("Report not found");
-        if (!(await isInManagerChain(userId, existing.submittedBy))) {
-          throw new AuthorizationError("You can only review reports from your own team");
-        }
-      }
+      const existing = await getReportById(reportId);
+      if (!existing) throw new NotFoundError("Report not found");
+      await requireReportReviewer(authReq.user, existing);
 
       const { status, reviewComment } = updateReportStatusSchema.parse(await req.json());
 

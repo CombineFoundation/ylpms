@@ -6,7 +6,7 @@ import { errorMessage } from "@/lib/api-client";
 import { formatFileSize, openReportAttachment } from "@/lib/report-attachments";
 import type { ReportAttachment } from "@/types/report.types";
 
-/** Attached PDFs on a report; each opens in a new tab via the permission-checked API. */
+/** Attached files (PDFs or images) on a report; each opens in a new tab via the permission-checked API. */
 export function ReportAttachments({ reportId, attachments }: { reportId: string; attachments: ReportAttachment[] }) {
   const [openingIndex, setOpeningIndex] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -19,7 +19,7 @@ export function ReportAttachments({ reportId, attachments }: { reportId: string;
     try {
       await openReportAttachment(reportId, index);
     } catch (err) {
-      setError(errorMessage(err, "Couldn't open this PDF."));
+      setError(errorMessage(err, "Couldn't open this file."));
     } finally {
       setOpeningIndex(null);
     }
@@ -42,7 +42,7 @@ export function ReportAttachments({ reportId, attachments }: { reportId: string;
               disabled={openingIndex === index}
               className="shrink-0 text-xs font-semibold text-brand hover:underline disabled:opacity-50"
             >
-              {openingIndex === index ? "Opening..." : "Open PDF"}
+              {openingIndex === index ? "Opening..." : "Open"}
             </button>
           </li>
         ))}

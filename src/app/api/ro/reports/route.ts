@@ -5,8 +5,8 @@ import { AuthenticationError } from "@/utils/errors";
 import { apiError, apiSuccess } from "@/utils/api-response";
 
 /**
- * GET /api/ro/reports - Reports submitted by the RO's youth leaders (view-only for the RO;
- * the SRO reviews them). The RO's own reports come from GET /api/reports.
+ * GET /api/ro/reports - Reports submitted by the RO's youth leaders, which the RO reviews
+ * (PATCH /api/reports/[reportId]). The RO's own reports come from GET /api/reports.
  * A developer passes ?roId= to view a specific RO's team.
  */
 export const GET = withAuth(async (req) => {

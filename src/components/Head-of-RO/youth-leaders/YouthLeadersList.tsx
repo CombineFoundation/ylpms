@@ -7,11 +7,12 @@ import { YouthLeadersTable } from "./YouthLeadersTable";
 import { AddYouthLeaderModal, type AddYouthLeaderForm } from "./AddYouthLeaderModal";
 import { PageHeader, emptyMessage } from "../shared/ListParts";
 import { UserToolbar } from "../shared/UserToolbar";
+import { exportMembersCsv } from "../shared/exportMembers";
 import { ManagerFilter } from "../shared/ManagerFilter";
 import { UserDetailModal } from "../shared/UserDetailModal";
 import { useUserAdminActions } from "../shared/useUserAdminActions";
 import { AssignRoModal } from "./AssignRoModal";
-import { matchesQuery, regionOptions, toUserRow, type ApiUser, type StatusFilter, type UserRow } from "../shared/users";
+import { matchesFilters, regionOptions, toUserRow, type ApiUser, type StatusFilter, type UserRow } from "../shared/users";
 
 /**
  * Directory of Youth Leaders. Head RO can add one directly (an RO's additions
@@ -31,10 +32,10 @@ export function YouthLeadersList() {
   const leaders = useMemo(() => list.items.map(toUserRow), [list.items]);
 
   const [query, setQuery] = useState("");
-  // Search runs on the client, so fetch the remaining pages while searching.
-  useLoadAllWhileSearching(list, query);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("All");
   const [regionFilter, setRegionFilter] = useState("");
+  // Search and filters run on the client, so fetch the remaining pages while either is in use.
+  useLoadAllWhileSearching(list, query, statusFilter !== "All" || !!regionFilter);
   const [viewing, setViewing] = useState<UserRow | null>(null);
   const [isAdding, setIsAdding] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -65,15 +66,19 @@ export function YouthLeadersList() {
   };
 
   const filtered = useMemo(
-    () =>
-      leaders.filter(
-        (leader) =>
-          matchesQuery(leader, query) &&
-          (statusFilter === "All" || leader.status === statusFilter) &&
-          (!regionFilter || leader.regionLabel === regionFilter)
-      ),
+    () => leaders.filter((row) => matchesFilters(row, { query, statusFilter, regionFilter })),
     [leaders, query, statusFilter, regionFilter]
   );
+
+  const exportCsv = () =>
+    exportMembersCsv({
+      path: `/api/users?role=youth-leader${scope}`,
+      keep: (row) => matchesFilters(row, { query, statusFilter, regionFilter }),
+      fileStem: "youth-leaders",
+      regionLabel: "City",
+      managerLabel: "RO",
+      teamLabel: "Volunteers",
+    });
 
   const isFiltered = !!query.trim() || statusFilter !== "All" || !!regionFilter || !!scope;
 
@@ -91,13 +96,14 @@ export function YouthLeadersList() {
       )}
 
       <UserToolbar
+        onExport={exportCsv}
         query={query}
         onQueryChange={setQuery}
         searchPlaceholder="Search youth leaders by name, email, RO or city..."
         regionLabel="City"
         statusFilter={statusFilter}
         onStatusFilterChange={setStatusFilter}
-        regions={regionOptions(leaders)}
+        regions={regionOptions(leaders, true)}
         regionFilter={regionFilter}
         onRegionFilterChange={setRegionFilter}
         unassignedOnly={{
@@ -127,6 +133,7 @@ export function YouthLeadersList() {
         onView={setViewing}
         onAssignRo={setAssigning}
         onStatusChange={admin.requestStatusChange}
+        onSendReset={admin.requestPasswordReset}
       />
 
       <UserDetailModal user={viewing} managerLabel="Reporting Officer" reportsLabel="Volunteers" onClose={() => setViewing(null)} />

@@ -5,7 +5,8 @@ import type { ApiCertificate } from "./certificate.types";
 /**
  * The printable certificate (A4 landscape): Combine Foundation's orange / navy
  * bands, logo, gold rosette and seal, and the Head of RO's signature. Opened in
- * its own window and printed, where it can be saved as a PDF.
+ * its own window to print, or rendered off-screen and saved as a PDF
+ * (certificate-pdf.ts).
  */
 
 const escapeHtml = (value: string) =>
@@ -93,11 +94,13 @@ function sealSvg() {
 }
 
 /**
- * Standalone printable page for one certificate (print → "Save as PDF").
- * `assetBase` is the site origin: the page is opened from a blob: URL, so
- * images need absolute addresses.
+ * Standalone page for one certificate. `assetBase` is the site origin: the
+ * page is opened from a blob: URL, so images (and the verify link) need
+ * absolute addresses. With `autoPrint` it opens the print dialog once loaded;
+ * without, it's only rendered (e.g. to make a PDF from it).
  */
-export function certificateHtml(certificate: ApiCertificate, assetBase = "") {
+export function certificateHtml(certificate: ApiCertificate, assetBase = "", { autoPrint = true } = {}) {
+  const verifyUrl = `${assetBase}/verify?n=${encodeURIComponent(certificate.certificateNumber)}`;
   const kindLine = certificate.kind === "organizer" ? "OF LEADERSHIP" : "OF PARTICIPATION";
   const asset = (path: string) => `${assetBase}${path}`;
 
@@ -138,6 +141,7 @@ export function certificateHtml(certificate: ApiCertificate, assetBase = "") {
   .sign .who { margin-top: 3mm; font-family: Montserrat, Arial, sans-serif; font-weight: 600; font-size: 4.4mm; letter-spacing: .5mm; text-transform: uppercase; color: #1f2a3a; }
   .sign .role { margin-top: 1.2mm; font-family: Montserrat, Arial, sans-serif; font-weight: 500; font-size: 3.7mm; color: #374151; }
   .seal { position: absolute; bottom: 17mm; right: 60mm; width: 34mm; }
+  .verify { position: absolute; bottom: 6mm; left: 6mm; font-family: Montserrat, Arial, sans-serif; font-size: 2.8mm; color: #4b5563; }
   .rosette svg, .seal svg { display: block; width: 100%; height: auto; }
   @media print { html, body { background: #fff; } .page { margin: 0; } }
 </style>
@@ -164,14 +168,19 @@ export function certificateHtml(certificate: ApiCertificate, assetBase = "") {
     </div>
   </div>
   <div class="seal">${sealSvg()}</div>
+  <div class="verify">Verify this certificate at ${escapeHtml(verifyUrl.replace(/^https?:\/\//, ""))}</div>
   <div class="bars"><span style="background:#e25600"></span><span style="background:#174a82"></span><span style="background:#2196d3"></span><span style="background:#f5ad1b"></span></div>
 </div>
-<script>
+${
+  autoPrint
+    ? `<script>
   // Print once the logo, signature and fonts have loaded.
   window.onload = function () {
     (document.fonts ? document.fonts.ready : Promise.resolve()).then(function () { window.focus(); window.print(); });
   };
 </script>
-</body>
+`
+    : ""
+}</body>
 </html>`;
 }

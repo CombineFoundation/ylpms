@@ -8,7 +8,9 @@ import type { UserRow } from "./users";
 
 type PendingAction =
   | { kind: "delete"; user: UserRow; impact: { directReports: number; openTasks: number } | null }
-  | { kind: "status"; user: UserRow; status: UserStatus };
+  | { kind: "status"; user: UserRow; status: UserStatus }
+  | { kind: "reset"; user: UserRow }
+  | { kind: "reset-sent"; user: UserRow };
 
 const statusVerb: Record<UserStatus, string> = {
   active: "Reactivate",
@@ -51,6 +53,24 @@ export function useUserAdminActions(noun: string, onChanged: () => void) {
   const requestStatusChange = (user: UserRow, status: UserStatus) => {
     setError(null);
     setPending({ kind: "status", user, status });
+  };
+
+  const requestPasswordReset = (user: UserRow) => {
+    setError(null);
+    setPending({ kind: "reset", user });
+  };
+
+  const sendReset = async (user: UserRow) => {
+    setIsBusy(true);
+    setError(null);
+    try {
+      await apiFetch(`/api/users/${user.id}/password-reset`, { method: "POST" });
+      setPending({ kind: "reset-sent", user });
+    } catch (err) {
+      setError(errorMessage(err, "Couldn't send the email. Please try again."));
+    } finally {
+      setIsBusy(false);
+    }
   };
 
   const run = async (action: () => Promise<unknown>) => {
@@ -127,5 +147,34 @@ export function useUserAdminActions(noun: string, onChanged: () => void) {
     );
   }
 
-  return { requestDelete, requestStatusChange, dialog };
+  if (pending?.kind === "reset") {
+    const { user } = pending;
+    dialog = (
+      <ConfirmDialog
+        isOpen
+        title={`Send ${user.name} a password reset link?`}
+        tone="primary"
+        confirmLabel="Send link"
+        isBusy={isBusy}
+        error={error}
+        message={`We'll email ${user.email} a link to set a new password, e.g. if their welcome email never arrived. Nothing else about their account changes.`}
+        onConfirm={() => sendReset(user)}
+        onCancel={close}
+      />
+    );
+  } else if (pending?.kind === "reset-sent") {
+    dialog = (
+      <ConfirmDialog
+        isOpen
+        title="Link sent"
+        tone="primary"
+        confirmLabel="Done"
+        message={`A password reset link was emailed to ${pending.user.email}. Ask them to check their spam folder if it doesn't arrive.`}
+        onConfirm={close}
+        onCancel={close}
+      />
+    );
+  }
+
+  return { requestDelete, requestStatusChange, requestPasswordReset, dialog };
 }

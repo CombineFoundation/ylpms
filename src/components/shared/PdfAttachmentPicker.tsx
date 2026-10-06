@@ -1,27 +1,36 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { FileText, Paperclip, X } from "lucide-react";
-import { MAX_REPORT_ATTACHMENTS, formatFileSize, pdfFileError } from "@/lib/report-attachments";
+import { FileImage, FileText, Paperclip, X } from "lucide-react";
+import { ATTACHMENT_ACCEPT, MAX_ATTACHMENTS, attachmentFileError, formatFileSize } from "@/lib/report-attachments";
+import { isImageAttachment } from "@/utils/attachment-types";
 import { FieldError } from "@/components/Head-of-RO/shared/ListParts";
 import type { ReportAttachment } from "@/types/report.types";
+
+function FileIcon({ name }: { name: string }) {
+  return isImageAttachment(name) ? (
+    <FileImage className="h-4 w-4 shrink-0 text-sky-500" />
+  ) : (
+    <FileText className="h-4 w-4 shrink-0 text-red-500" />
+  );
+}
 
 type PdfAttachmentPickerProps = {
   files: File[];
   onChange: (files: File[]) => void;
   disabled?: boolean;
   label?: string;
-  /** How many new files may be picked; less than the limit when some PDFs are already attached. */
+  /** How many new files may be picked; less than the limit when some are already attached. */
   maxFiles?: number;
 };
 
-/** Pick up to MAX_REPORT_ATTACHMENTS PDFs (checked client-side; the server re-checks on upload). */
+/** Pick up to MAX_ATTACHMENTS PDFs or images (checked client-side; the server re-checks on upload). */
 export function PdfAttachmentPicker({
   files,
   onChange,
   disabled = false,
-  label = "PDF attachments",
-  maxFiles = MAX_REPORT_ATTACHMENTS,
+  label = "Attachments",
+  maxFiles = MAX_ATTACHMENTS,
 }: PdfAttachmentPickerProps) {
   const [fileError, setFileError] = useState<string | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
@@ -31,13 +40,13 @@ export function PdfAttachmentPicker({
     setFileError(null);
     const next = [...files];
     for (const file of Array.from(picked)) {
-      const problem = pdfFileError(file);
+      const problem = attachmentFileError(file);
       if (problem) {
         setFileError(problem);
         continue;
       }
       if (next.length >= maxFiles) {
-        setFileError(`You can attach up to ${MAX_REPORT_ATTACHMENTS} PDFs.`);
+        setFileError(`You can attach up to ${MAX_ATTACHMENTS} files.`);
         break;
       }
       if (!next.some((existing) => existing.name === file.name && existing.size === file.size)) next.push(file);
@@ -49,14 +58,14 @@ export function PdfAttachmentPicker({
   return (
     <div>
       <p className="text-sm font-medium text-gray-700">
-        {label} <span className="font-normal text-gray-400">(optional, up to {MAX_REPORT_ATTACHMENTS}, 10 MB each)</span>
+        {label} <span className="font-normal text-gray-400">(optional, up to {MAX_ATTACHMENTS}, 10 MB each)</span>
       </p>
       {files.length > 0 && (
         <ul className="mt-2 divide-y divide-gray-100 rounded-lg border border-gray-100">
           {files.map((file, index) => (
             <li key={`${file.name}-${file.size}`} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
               <span className="flex min-w-0 items-center gap-2">
-                <FileText className="h-4 w-4 shrink-0 text-red-500" />
+                <FileIcon name={file.name} />
                 <span className="truncate text-gray-700">{file.name}</span>
                 <span className="shrink-0 text-xs text-gray-400">{formatFileSize(file.size)}</span>
               </span>
@@ -76,11 +85,11 @@ export function PdfAttachmentPicker({
       {files.length < maxFiles && (
         <label className="mt-2 inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-dashed border-gray-300 px-3 py-2 text-sm font-medium text-gray-600 hover:border-brand hover:text-brand">
           <Paperclip className="h-4 w-4" />
-          {files.length ? "Add another PDF" : "Upload PDF"}
+          {files.length ? "Add another file" : "Upload PDF or photo"}
           <input
             ref={fileInput}
             type="file"
-            accept="application/pdf,.pdf"
+            accept={ATTACHMENT_ACCEPT}
             multiple
             disabled={disabled}
             onChange={(event) => addFiles(event.target.files)}
@@ -99,7 +108,7 @@ type AttachedPdfListProps = {
   disabled?: boolean;
 };
 
-/** PDFs already on an earlier submission that is being resubmitted; each stays attached unless removed. */
+/** Files already on an earlier submission that is being resubmitted; each stays attached unless removed. */
 export function AttachedPdfList({ attachments, onChange, disabled = false }: AttachedPdfListProps) {
   if (attachments.length === 0) return null;
   return (
@@ -109,7 +118,7 @@ export function AttachedPdfList({ attachments, onChange, disabled = false }: Att
         {attachments.map((attachment) => (
           <li key={attachment.path} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
             <span className="flex min-w-0 items-center gap-2">
-              <FileText className="h-4 w-4 shrink-0 text-red-500" />
+              <FileIcon name={attachment.name} />
               <span className="truncate text-gray-700">{attachment.name}</span>
               <span className="shrink-0 text-xs text-gray-400">{formatFileSize(attachment.size)}</span>
             </span>

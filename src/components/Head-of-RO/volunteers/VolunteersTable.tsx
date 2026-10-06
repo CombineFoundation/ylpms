@@ -1,5 +1,6 @@
 import { getInitials } from "@/utils/user-status";
 import { LoadMoreButton, StatusBadge, TableMessageRow } from "../shared/ListParts";
+import { UserRowActions } from "../shared/UserRowActions";
 import type { UserRow } from "../shared/users";
 
 type VolunteersTableProps = {
@@ -11,6 +12,7 @@ type VolunteersTableProps = {
   isLoadingMore: boolean;
   onLoadMore: () => void;
   onView: (volunteer: UserRow) => void;
+  onSendReset: (volunteer: UserRow) => void;
 };
 
 export function VolunteersTable({
@@ -22,6 +24,7 @@ export function VolunteersTable({
   isLoadingMore,
   onLoadMore,
   onView,
+  onSendReset,
 }: VolunteersTableProps) {
   return (
     <div className="overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm">
@@ -34,11 +37,12 @@ export function VolunteersTable({
               <th className="px-6 py-3.5">City</th>
               <th className="px-6 py-3.5">Status</th>
               <th className="px-6 py-3.5">Joined</th>
+              <th className="px-6 py-3.5">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {isLoading && <TableMessageRow colSpan={5} message="Loading volunteers..." />}
-            {!isLoading && error && <TableMessageRow colSpan={5} message={error} error />}
+            {isLoading && <TableMessageRow colSpan={6} message="Loading volunteers..." />}
+            {!isLoading && error && <TableMessageRow colSpan={6} message={error} error />}
             {!isLoading &&
               !error &&
               volunteers.map((volunteer) => (
@@ -62,9 +66,12 @@ export function VolunteersTable({
                     <StatusBadge status={volunteer.status} />
                   </td>
                   <td className="px-6 py-4 text-gray-500">{volunteer.joined}</td>
+                  <td className="px-6 py-4">
+                    <UserRowActions user={volunteer} onSendReset={onSendReset} />
+                  </td>
                 </tr>
               ))}
-            {!isLoading && !error && volunteers.length === 0 && <TableMessageRow colSpan={5} message={emptyMessage} />}
+            {!isLoading && !error && volunteers.length === 0 && <TableMessageRow colSpan={6} message={emptyMessage} />}
           </tbody>
         </table>
       </div>

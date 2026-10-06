@@ -1,6 +1,6 @@
 "use client";
 
-import { Ban, Pencil, RotateCcw, Trash2 } from "lucide-react";
+import { Ban, KeyRound, Pencil, RotateCcw, Trash2 } from "lucide-react";
 import type { UserStatus } from "@/types/user.types";
 import type { UserRow } from "./users";
 
@@ -9,10 +9,12 @@ type UserRowActionsProps = {
   onEdit?: (user: UserRow) => void;
   onDelete?: (user: UserRow) => void;
   onStatusChange?: (user: UserRow, status: UserStatus) => void;
+  /** Email them a link to set a new password. */
+  onSendReset?: (user: UserRow) => void;
 };
 
 /** Edit / suspend-or-reactivate / delete icon buttons for a user table row. */
-export function UserRowActions({ user, onEdit, onDelete, onStatusChange }: UserRowActionsProps) {
+export function UserRowActions({ user, onEdit, onDelete, onStatusChange, onSendReset }: UserRowActionsProps) {
   const isDisabled = user.storedStatus === "inactive" || user.storedStatus === "suspended";
 
   return (
@@ -50,6 +52,17 @@ export function UserRowActions({ user, onEdit, onDelete, onStatusChange }: UserR
             <Ban className="h-4 w-4" />
           </button>
         ))}
+      {onSendReset && (
+        <button
+          type="button"
+          onClick={() => onSendReset(user)}
+          aria-label={`Send ${user.name} a password reset link`}
+          title="Send password reset link"
+          className="text-gray-400 hover:text-brand"
+        >
+          <KeyRound className="h-4 w-4" />
+        </button>
+      )}
       {onDelete && (
         <button
           type="button"

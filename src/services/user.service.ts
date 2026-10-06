@@ -32,7 +32,7 @@ import { COHORT_ROLES, getCurrentCohort } from "./cohort.service";
 import { OPEN_TASK_STATUSES } from "@/types/task.types";
 import { createActivityLog } from "./activitylog.service";
 import { getFirebaseAdminAuth } from "@/lib/firebase-admin";
-import { sendUserCredentialsEmail } from "@/lib/mailer";
+import { sendPasswordResetLinkEmail, sendUserCredentialsEmail } from "@/lib/mailer";
 import { notifyUsers, getUserIdsByRoles, filterUsersByPreference } from "./notification.service";
 
 /**
@@ -646,6 +646,26 @@ export async function setUsersManager(
     logger.error("Error setting users' manager", error);
     throw error;
   }
+}
+
+/**
+ * Emails a user a Firebase link to set a new password — e.g. when their welcome
+ * email never arrived. Their account and data are unchanged.
+ */
+export async function sendPasswordReset(userId: string, sentByUserId: string): Promise<void> {
+  const user = await getUserById(userId);
+  if (!user) throw new NotFoundError("User not found");
+
+  const link = await getFirebaseAdminAuth().generatePasswordResetLink(user.email);
+  await sendPasswordResetLinkEmail(user.email, user.name, link);
+
+  await createActivityLog({
+    userId: sentByUserId,
+    action: "user-updated",
+    description: `Sent a password reset link to ${user.name} (${user.email})`,
+    entityType: "user",
+    entityId: userId,
+  });
 }
 
 /**

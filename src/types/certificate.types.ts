@@ -33,3 +33,16 @@ export interface Certificate {
   createdAt: Timestamp | Date;
   updatedAt: Timestamp | Date;
 }
+
+/** GET /api/certificates/verify: only what's printed on the certificate. */
+export interface CertificateVerification {
+  certificateNumber: string;
+  recipientName: string;
+  title: string;
+  kind: CertificateKind;
+  eventTitle: string;
+  eventLocation: string;
+  eventDate: string | null;
+  issuedAt: string | null;
+  status: CertificateStatus;
+}

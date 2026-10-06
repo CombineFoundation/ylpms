@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useDeepLinkId } from "@/hooks/useDeepLinkId";
 import { apiFetch, errorMessage } from "@/lib/api-client";
 import { useLoadAllWhileSearching, usePagedList } from "@/hooks/usePagedList";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
@@ -41,6 +42,20 @@ export function TaskList() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [viewingSubmission, setViewingSubmission] = useState<TaskRow | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+
+  // A notification's link (?taskId=) opens that task's submission (it may be outside the current filter).
+  const [linkedTaskId, consumeLinkedTask] = useDeepLinkId("taskId");
+  useEffect(() => {
+    if (!linkedTaskId) return;
+    consumeLinkedTask();
+    apiFetch<ApiTask>(`/api/tasks/${linkedTaskId}`)
+      .then((task) => {
+        const row = toTaskRow({ ...task, assigneeName: task.assigneeName ?? "" });
+        if (row.submission) setViewingSubmission(row);
+        else setNotice(`"${row.title}" hasn't been submitted yet.`);
+      })
+      .catch((error) => setActionError(errorMessage(error, "Couldn't open that task.")));
+  }, [linkedTaskId, consumeLinkedTask]);
 
   const filteredTasks = useMemo(() => {
     const q = query.trim().toLowerCase();
