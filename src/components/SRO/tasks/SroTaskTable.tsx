@@ -36,10 +36,10 @@ type SroTaskTableProps = {
 
 /**
  * "Overdue" is derived from the due date, so it's never set directly. Assignees
- * only track progress: they finish by submitting, and the assigner reviews it.
+ * can't set status at all: they finish by submitting, and the assigner reviews it.
  */
 const SETTABLE_STATUSES: Record<SroTaskTableProps["mode"], TaskStatus[]> = {
-  mine: ["assigned", "in-progress"],
+  mine: [],
   team: ["assigned", "in-progress", "completed", "cancelled"],
   view: [],
 };
@@ -130,7 +130,7 @@ export function SroTaskTable({
                   </span>
                 </td>
                 <td className="px-4 py-3.5">
-                  {mode === "view" || (mode === "mine" && LOCKED_FOR_ASSIGNEE.includes(t.status)) ? (
+                  {SETTABLE_STATUSES[mode].length === 0 ? (
                     <span className={`inline-block whitespace-nowrap rounded-full px-3 py-1 text-xs font-semibold ${statusStyles[t.status]}`}>
                       {statusLabels[t.status]}
                     </span>

@@ -1,7 +1,8 @@
 /**
- * Program months run from the cohort's start day to the same day next month,
- * Pakistan time (UTC+5, no daylight saving) — the 15th → 15th for YLP 2.0,
- * whose Month 1 starts Sep 15, 2026. Each cohort starts again at Month 1.
+ * Program months end on the cohort's start day each month, Pakistan time
+ * (UTC+5, no daylight saving), and the next month starts the day after. For
+ * YLP 2.0: Month 1 is Sep 15 – Oct 15, 2026, Month 2 Oct 16 – Nov 15, Month 3
+ * Nov 16 – Dec 15, … Each cohort starts again at Month 1.
  * Kept free of server-only imports so the UI can label months the same way.
  */
 
@@ -45,7 +46,8 @@ const cycleBoundary = (cohort: CycleCohort, monthsAfterStart: number) => {
 const shortDate = (date: Date) => formatDate(date);
 
 export function cycleByNumber(number: number, cohort: CycleCohort = YLP_2): MonthlyCycle {
-  const start = cycleBoundary(cohort, number - 1);
+  // Month 1 starts on the cohort's first day; later months the day after the previous one ends.
+  const start = number === 1 ? cycleBoundary(cohort, 0) : new Date(cycleBoundary(cohort, number - 1).getTime() + DAY_MS);
   const end = new Date(cycleBoundary(cohort, number).getTime() + DAY_MS - 1);
   return {
     number,
@@ -64,8 +66,10 @@ export function currentCycle(date = new Date(), cohort: CycleCohort = YLP_2): Mo
   const start = pktStart(cohort);
   const pkt = new Date(date.getTime() + PKT_OFFSET_MS);
   let months = (pkt.getUTCFullYear() - start.year) * 12 + (pkt.getUTCMonth() - start.monthIndex);
-  if (pkt.getUTCDate() < start.day) months -= 1;
-  return months < 0 ? null : cycleByNumber(months + 1, cohort);
+  // The start day itself still belongs to the month that's ending (Oct 15 is Month 1).
+  if (pkt.getUTCDate() <= start.day) months -= 1;
+  // ...except the cohort's very first day, which opens Month 1.
+  return cycleByNumber(Math.max(months, 0) + 1, cohort);
 }
 
 /** "YYYY-MM-DD" → midnight at the start of that day, Pakistan time. */

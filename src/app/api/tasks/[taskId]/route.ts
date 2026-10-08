@@ -76,13 +76,9 @@ export async function PATCH(req: NextRequest, { params }: Params) {
         const otherFields = Object.keys(validatedData).filter((key) => key !== "status");
         if (otherFields.length > 0) throw new AuthorizationError("Only whoever assigned this task can change its details");
       }
+      // Status moves only by submitting work and its review, never by the assignee directly.
       if (isAssigneeOnly && validatedData.status && validatedData.status !== task.status) {
-        if (task.status === "submitted" || task.status === "completed" || task.status === "cancelled") {
-          throw new AuthorizationError("This task is with your reviewer; you can't change its status");
-        }
-        if (validatedData.status !== "assigned" && validatedData.status !== "in-progress") {
-          throw new AuthorizationError("Submit your work to finish this task; whoever assigned it reviews it");
-        }
+        throw new AuthorizationError("You can't change a task's status. Submit your work and whoever assigned it reviews it.");
       }
 
       // Submitted work is accepted or sent back through the review step, so it's recorded and the assignee is told.

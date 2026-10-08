@@ -2,8 +2,8 @@ import type { UserRole } from "@/types/user.types";
 import type { TaskPriority } from "@/types/task.types";
 
 /**
- * Program month task lists. Each program month runs from the 15th to the 15th
- * (Pakistan time): Month 1 is Sep 15 – Oct 15, 2026, Month 2 Oct 15 – Nov 15, …
+ * Program month task lists. Each program month ends on the 15th (Pakistan
+ * time): Month 1 is Sep 15 – Oct 15, 2026, Month 2 Oct 16 – Nov 15, …
  *
  * "Assign Monthly Task" (Tasks page of Head RO / SRO / RO) assigns the current
  * month's list to every active or idle youth leader in the clicker's scope
@@ -75,6 +75,133 @@ export const MONTHLY_TASKS: Record<number, Partial<Record<MonthlyTaskRole, Month
         id: "six-month-plan",
         title: "Submit 6 month planning document",
         description: "Prepare and submit your plan for the six months of the program.",
+        priority: "high",
+      },
+    ],
+  },
+  // Oct 16 – Nov 15, 2026
+  2: {
+    "youth-leader": [
+      {
+        id: "training-session",
+        title: "Attend training session",
+        description: "Attend this month's YLP training session.",
+      },
+      {
+        id: "self-webinar",
+        title: "Self webinar (min. 30 participants)",
+        description: "Host your own webinar with at least 30 participants.",
+      },
+      {
+        id: "onboard-5-volunteers",
+        title: "Onboard 5 volunteers",
+        description: "Onboard five new volunteers to your team and request them from your Volunteers page.",
+        priority: "high",
+      },
+      {
+        id: "volunteer-intro-meeting",
+        title: "Volunteer team introductory meeting (10 volunteers)",
+        description: "Hold an introductory meeting with your volunteer team, with at least 10 volunteers.",
+      },
+      {
+        id: "guest-speaker-webinar",
+        title: "Guest speaker webinar (min. 50 participants)",
+        description: "Organize a webinar with a guest speaker and at least 50 participants.",
+      },
+      {
+        id: "volunteer-profile-building",
+        title: "Volunteer profile building",
+        description: "Help your volunteers build and update their profiles.",
+      },
+      {
+        id: "performance-report",
+        title: "Submit month 2 performance report",
+        description: "Submit your month 2 performance report, including your volunteers' performance.",
+        priority: "high",
+      },
+    ],
+  },
+  // Nov 16 – Dec 15, 2026
+  3: {
+    "youth-leader": [
+      {
+        id: "training-session",
+        title: "Attend training session",
+        description: "Attend this month's YLP training session.",
+      },
+      {
+        id: "awareness-campaign-approval",
+        title: "Approval document with budget and plan for awareness campaign",
+        description: "Submit the approval document for your awareness campaign, with its budget and plan.",
+        priority: "high",
+      },
+      {
+        id: "onboard-5-volunteers",
+        title: "Onboard 5 volunteers",
+        description: "Onboard five new volunteers to your team and request them from your Volunteers page.",
+        priority: "high",
+      },
+      {
+        id: "volunteer-intro-meeting",
+        title: "Volunteer team introductory meeting (15 volunteers)",
+        description: "Hold an introductory meeting with your volunteer team, with at least 15 volunteers.",
+      },
+      {
+        id: "awareness-campaign",
+        title: "Awareness campaign",
+        description: "Run the awareness campaign from your approved plan.",
+      },
+      {
+        id: "digital-portfolio",
+        title: "Google Drive digital portfolio",
+        description: "Put all your activities in one Google Drive folder and share its link, so everything can be checked in one place.",
+      },
+      {
+        id: "performance-report",
+        title: "Submit month 3 performance report",
+        description: "Submit your month 3 performance report, including your volunteers' performance.",
+        priority: "high",
+      },
+    ],
+  },
+  // Dec 16, 2026 – Jan 15, 2027
+  4: {
+    "youth-leader": [
+      {
+        id: "training-session",
+        title: "Attend training session",
+        description: "Attend this month's YLP training session.",
+      },
+      {
+        id: "onboard-5-volunteers",
+        title: "Onboard 5 volunteers",
+        description: "Onboard five new volunteers to your team and request them from your Volunteers page.",
+        priority: "high",
+      },
+      {
+        id: "volunteer-intro-meeting",
+        title: "Volunteer team introductory meeting (20 volunteers)",
+        description: "Hold an introductory meeting with your volunteer team, with at least 20 volunteers.",
+      },
+      {
+        id: "survey",
+        title: "Survey (min. 50 responses)",
+        description: "Conduct a survey and collect at least 50 responses.",
+      },
+      {
+        id: "profile-and-volunteer-portfolio",
+        title: "Update your profile and volunteer portfolio",
+        description: "Update your profile (e.g. upload your activities on LinkedIn) and your volunteers' portfolio.",
+      },
+      {
+        id: "social-media-campaign",
+        title: "Execute one social media awareness campaign",
+        description: "Plan and run one awareness campaign on social media.",
+      },
+      {
+        id: "performance-report",
+        title: "Submit month 4 performance report",
+        description: "Submit your month 4 performance report, including your volunteers' performance and a reflection paragraph.",
         priority: "high",
       },
     ],
