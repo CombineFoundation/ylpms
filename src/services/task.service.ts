@@ -438,9 +438,10 @@ export async function reviewTask(
   const note = input.note?.trim() || undefined;
   if (!accepted && !note) throw new ValidationError("Say what needs to change");
 
+  // Firestore rejects nested `undefined`, so leave `note` out when there isn't one.
   const review: TaskReview = {
     decision: accepted ? "accepted" : "changes-requested",
-    note,
+    ...(note ? { note } : {}),
     reviewedBy: reviewerId,
     reviewedAt: new Date(),
   };

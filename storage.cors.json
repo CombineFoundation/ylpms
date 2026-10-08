@@ -1,8 +1,15 @@
 [
   {
-    "origin": ["*"],
-    "method": ["PUT"],
-    "responseHeader": ["Content-Type", "x-goog-content-length-range"],
+    "origin": [
+      "https://ylp.combinefoundation.org",
+      "http://localhost:3000"
+    ],
+    "method": ["GET", "HEAD", "PUT", "POST"],
+    "responseHeader": [
+      "Content-Type",
+      "x-goog-content-length-range",
+      "x-goog-resumable"
+    ],
     "maxAgeSeconds": 3600
   }
 ]

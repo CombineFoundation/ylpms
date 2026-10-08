@@ -127,23 +127,9 @@ export function Leaderboard() {
 
       {data && entries.length === 0 && (
         <p className="rounded-2xl border border-dashed border-gray-200 bg-white px-6 py-10 text-center text-sm text-gray-500">
-          No one is ranked yet. The leaderboard fills in as {activeTab === "volunteers" ? "volunteers" : "youth leaders"} complete
-          tasks and activities.
+          No one is ranked yet. The leaderboard fills in as {activeTab === "volunteers" ? "volunteers" : "youth leaders"} are
+          assigned tasks.
         </p>
-      )}
-
-      {mine && (
-        <div className="flex flex-wrap items-center gap-4 rounded-2xl border border-brand/20 bg-brand/5 px-5 py-4">
-          <Avatar name={mine.name} tier={mine.tier} />
-          <div className="flex-1">
-            <p className="text-xs font-semibold uppercase tracking-wider text-brand-dark">Your standing</p>
-            <p className="text-sm text-gray-700">
-              <span className="text-lg font-bold text-gray-900">#{mine.rank}</span> of {entries.length}
-            </p>
-          </div>
-          <TierBadge tier={mine.tier} />
-          <span className="text-2xl font-bold text-gray-900">{mine.score}</span>
-        </div>
       )}
 
       {entries.length > 0 && <Podium entries={entries.slice(0, 3)} />}
@@ -176,6 +162,25 @@ export function Leaderboard() {
             );
           })}
         </ol>
+      )}
+
+      {/* Pinned to the bottom of the screen, so your own rank shows without scrolling. */}
+      {mine && (
+        <div className="sticky bottom-3 z-10 flex items-center gap-3 rounded-2xl border border-brand/30 bg-white px-4 py-3 shadow-lg sm:px-5">
+          <span className="shrink-0 text-lg font-bold text-gray-900">#{mine.rank}</span>
+          <Avatar name={mine.name} tier={mine.tier} />
+          <span className="min-w-0 flex-1">
+            <span className="block text-xs font-semibold uppercase tracking-wider text-brand-dark">Your rank</span>
+            <span className="block truncate text-sm text-gray-600">
+              {mine.name} · of {entries.length}
+            </span>
+          </span>
+          <span className="hidden sm:inline-flex">
+            <TierBadge tier={mine.tier} />
+          </span>
+          <TierIcon tier={mine.tier} className="sm:hidden" />
+          <span className="w-10 shrink-0 text-right text-xl font-bold text-gray-900">{mine.score}</span>
+        </div>
       )}
     </div>
   );
