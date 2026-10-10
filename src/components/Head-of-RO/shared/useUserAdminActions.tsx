@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { apiFetch, errorMessage } from "@/lib/api-client";
+import { useTemporaryPassword } from "@/components/shared/useTemporaryPassword";
 import type { UserStatus } from "@/types/user.types";
 import type { UserRow } from "./users";
 
@@ -28,6 +29,7 @@ export function useUserAdminActions(noun: string, onChanged: () => void) {
   const [pending, setPending] = useState<PendingAction | null>(null);
   const [isBusy, setIsBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const temporaryPassword = useTemporaryPassword();
 
   const close = () => {
     if (isBusy) return;
@@ -176,5 +178,11 @@ export function useUserAdminActions(noun: string, onChanged: () => void) {
     );
   }
 
-  return { requestDelete, requestStatusChange, requestPasswordReset, dialog };
+  return {
+    requestDelete,
+    requestStatusChange,
+    requestPasswordReset,
+    requestSetPassword: temporaryPassword.request,
+    dialog: dialog ?? temporaryPassword.dialog,
+  };
 }

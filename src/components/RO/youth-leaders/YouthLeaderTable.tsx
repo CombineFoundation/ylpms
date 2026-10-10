@@ -1,18 +1,22 @@
 import { getInitials } from "@/utils/user-status";
 import { StatusBadge, TableMessageRow } from "@/components/Head-of-RO/shared/ListParts";
 import type { UserRow } from "@/components/Head-of-RO/shared/users";
+import { SetPasswordButton } from "@/components/Head-of-RO/shared/UserRowActions";
 
 type YouthLeaderTableProps = {
   leaders: UserRow[];
   isLoading: boolean;
   error: string | null;
   emptyMessage: string;
+  /** Set a temporary password for a youth leader who hasn't signed in yet. */
+  onSetPassword?: (leader: UserRow) => void;
 };
 
 const AVATAR_COLORS = ["bg-pink-500", "bg-blue-500", "bg-purple-500", "bg-emerald-500", "bg-brand"];
 const avatarColor = (id: string) => AVATAR_COLORS[[...id].reduce((sum, c) => sum + c.charCodeAt(0), 0) % AVATAR_COLORS.length];
 
-export function YouthLeaderTable({ leaders, isLoading, error, emptyMessage }: YouthLeaderTableProps) {
+export function YouthLeaderTable({ leaders, isLoading, error, emptyMessage, onSetPassword }: YouthLeaderTableProps) {
+  const colSpan = onSetPassword ? 6 : 5;
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
@@ -23,11 +27,12 @@ export function YouthLeaderTable({ leaders, isLoading, error, emptyMessage }: Yo
             <th className="px-4 py-3">Volunteers Under</th>
             <th className="px-4 py-3">Status</th>
             <th className="px-4 py-3">Joined</th>
+            {onSetPassword && <th className="px-4 py-3">Actions</th>}
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-50">
-          {isLoading && <TableMessageRow colSpan={5} message="Loading youth leaders..." />}
-          {!isLoading && error && <TableMessageRow colSpan={5} message={error} error />}
+          {isLoading && <TableMessageRow colSpan={colSpan} message="Loading youth leaders..." />}
+          {!isLoading && error && <TableMessageRow colSpan={colSpan} message={error} error />}
 
           {!isLoading &&
             !error &&
@@ -54,10 +59,15 @@ export function YouthLeaderTable({ leaders, isLoading, error, emptyMessage }: Yo
                   <StatusBadge status={leader.status} />
                 </td>
                 <td className="px-4 py-4 text-gray-500">{leader.joined}</td>
+                {onSetPassword && (
+                  <td className="px-4 py-4">
+                    {leader.status === "Pending" && <SetPasswordButton name={leader.name} onClick={() => onSetPassword(leader)} />}
+                  </td>
+                )}
               </tr>
             ))}
 
-          {!isLoading && !error && leaders.length === 0 && <TableMessageRow colSpan={5} message={emptyMessage} />}
+          {!isLoading && !error && leaders.length === 0 && <TableMessageRow colSpan={colSpan} message={emptyMessage} />}
         </tbody>
       </table>
     </div>

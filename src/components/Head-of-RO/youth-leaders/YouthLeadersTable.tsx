@@ -17,6 +17,7 @@ type YouthLeadersTableProps = {
   onAssignRo: (leader: UserRow) => void;
   onStatusChange: (leader: UserRow, status: UserStatus) => void;
   onSendReset: (leader: UserRow) => void;
+  onSetPassword: (leader: UserRow) => void;
 };
 
 export function YouthLeadersTable({
@@ -31,6 +32,7 @@ export function YouthLeadersTable({
   onAssignRo,
   onStatusChange,
   onSendReset,
+  onSetPassword,
 }: YouthLeadersTableProps) {
   return (
     <div className="overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm">
@@ -84,7 +86,7 @@ export function YouthLeadersTable({
                         <UserCog className="h-4 w-4" />
                         {leader.reportingToId ? "Change RO" : "Assign RO"}
                       </button>
-                      <UserRowActions user={leader} onStatusChange={onStatusChange} onSendReset={onSendReset} />
+                      <UserRowActions user={leader} onStatusChange={onStatusChange} onSendReset={onSendReset} onSetPassword={onSetPassword} />
                     </div>
                   </td>
                 </tr>

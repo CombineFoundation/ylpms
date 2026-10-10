@@ -13,6 +13,7 @@ type VolunteersTableProps = {
   onLoadMore: () => void;
   onView: (volunteer: UserRow) => void;
   onSendReset: (volunteer: UserRow) => void;
+  onSetPassword: (volunteer: UserRow) => void;
 };
 
 export function VolunteersTable({
@@ -25,6 +26,7 @@ export function VolunteersTable({
   onLoadMore,
   onView,
   onSendReset,
+  onSetPassword,
 }: VolunteersTableProps) {
   return (
     <div className="overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm">
@@ -67,7 +69,7 @@ export function VolunteersTable({
                   </td>
                   <td className="px-6 py-4 text-gray-500">{volunteer.joined}</td>
                   <td className="px-6 py-4">
-                    <UserRowActions user={volunteer} onSendReset={onSendReset} />
+                    <UserRowActions user={volunteer} onSendReset={onSendReset} onSetPassword={onSetPassword} />
                   </td>
                 </tr>
               ))}

@@ -28,6 +28,7 @@ import {
 } from "@/utils/errors";
 import { MANAGER_FIELD_FOR, MANAGER_ROLES_FOR } from "@/utils/authorization";
 import { normalizeMemberId } from "@/utils/member-id";
+import { getEffectiveStatus } from "@/utils/user-status";
 import { COHORT_ROLES, getCurrentCohort } from "./cohort.service";
 import { OPEN_TASK_STATUSES } from "@/types/task.types";
 import { createActivityLog } from "./activitylog.service";
@@ -114,7 +115,7 @@ export async function createUser(
     const memberId = data.memberId ? normalizeMemberId(data.memberId) : undefined;
     if (memberId) await requireMemberIdAvailable(memberId);
 
-    const temporaryPassword = `${crypto.randomUUID().replace(/-/g, "").slice(0, 12)}A!`;
+    const temporaryPassword = generateTemporaryPassword();
     let authUser;
     try {
       authUser = await getFirebaseAdminAuth().createUser({
@@ -666,6 +667,36 @@ export async function sendPasswordReset(userId: string, sentByUserId: string): P
     entityType: "user",
     entityId: userId,
   });
+}
+
+/**
+ * Gives a user who has never signed in a new temporary password and returns
+ * it, for their manager to pass on directly when the welcome email never
+ * arrived. They must still change it on first sign-in.
+ */
+export async function setTemporaryPassword(userId: string, setByUserId: string): Promise<string> {
+  const user = await getUserById(userId);
+  if (!user) throw new NotFoundError("User not found");
+  if (getEffectiveStatus(user) !== "Pending") {
+    throw new ValidationError(`${user.name} has already signed in. Send them a password reset link instead.`);
+  }
+
+  const temporaryPassword = generateTemporaryPassword();
+  await getFirebaseAdminAuth().updateUser(userId, { password: temporaryPassword });
+  await updateDoc("users", userId, { mustChangePassword: true });
+
+  await createActivityLog({
+    userId: setByUserId,
+    action: "user-updated",
+    description: `Set a new temporary password for ${user.name} (${user.email})`,
+    entityType: "user",
+    entityId: userId,
+  });
+  return temporaryPassword;
+}
+
+function generateTemporaryPassword(): string {
+  return `${crypto.randomUUID().replace(/-/g, "").slice(0, 12)}A!`;
 }
 
 /**

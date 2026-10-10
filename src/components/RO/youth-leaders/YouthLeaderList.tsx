@@ -10,6 +10,7 @@ import type { ApiMemberRequest } from "@/types/member-request.types";
 import { YouthLeaderTable } from "./YouthLeaderTable";
 import { RequestList } from "./RequestList";
 import { AddYouthLeaderModal } from "./AddYouthLeaderModal";
+import { useTemporaryPassword } from "@/components/shared/useTemporaryPassword";
 import type { AddYouthLeaderForm } from "./youth-leader.types";
 
 /**
@@ -35,6 +36,7 @@ export function YouthLeaderList() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [withdrawingId, setWithdrawingId] = useState<string | null>(null);
+  const temporaryPassword = useTemporaryPassword();
 
   const rows = useMemo(() => (leaders.data ?? []).map(toUserRow), [leaders.data]);
   const filtered = useMemo(() => {
@@ -131,6 +133,7 @@ export function YouthLeaderList() {
           leaders={filtered}
           isLoading={leaders.isLoading}
           error={leaders.error}
+          onSetPassword={temporaryPassword.request}
           emptyMessage={emptyMessage({
             isFiltered: !!search.trim(),
             noun: "youth leaders",
@@ -140,6 +143,7 @@ export function YouthLeaderList() {
       </section>
 
       <AddYouthLeaderModal askForId isOpen={isAdding} error={formError} onClose={() => setIsAdding(false)} onSubmit={handleAdd} />
+      {temporaryPassword.dialog}
     </div>
   );
 }

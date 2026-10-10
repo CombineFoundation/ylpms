@@ -1,6 +1,6 @@
 "use client";
 
-import { Ban, KeyRound, Pencil, RotateCcw, Trash2 } from "lucide-react";
+import { Ban, KeyRound, LockKeyhole, Pencil, RotateCcw, Trash2 } from "lucide-react";
 import type { UserStatus } from "@/types/user.types";
 import type { UserRow } from "./users";
 
@@ -11,10 +11,12 @@ type UserRowActionsProps = {
   onStatusChange?: (user: UserRow, status: UserStatus) => void;
   /** Email them a link to set a new password. */
   onSendReset?: (user: UserRow) => void;
+  /** Set a temporary password to pass on directly. Only shown until they first sign in. */
+  onSetPassword?: (user: UserRow) => void;
 };
 
 /** Edit / suspend-or-reactivate / delete icon buttons for a user table row. */
-export function UserRowActions({ user, onEdit, onDelete, onStatusChange, onSendReset }: UserRowActionsProps) {
+export function UserRowActions({ user, onEdit, onDelete, onStatusChange, onSendReset, onSetPassword }: UserRowActionsProps) {
   const isDisabled = user.storedStatus === "inactive" || user.storedStatus === "suspended";
 
   return (
@@ -63,6 +65,7 @@ export function UserRowActions({ user, onEdit, onDelete, onStatusChange, onSendR
           <KeyRound className="h-4 w-4" />
         </button>
       )}
+      {onSetPassword && user.status === "Pending" && <SetPasswordButton name={user.name} onClick={() => onSetPassword(user)} />}
       {onDelete && (
         <button
           type="button"
@@ -75,5 +78,20 @@ export function UserRowActions({ user, onEdit, onDelete, onStatusChange, onSendR
         </button>
       )}
     </div>
+  );
+}
+
+/** Icon button for "Set temporary password"; callers show it only for members who haven't signed in. */
+export function SetPasswordButton({ name, onClick }: { name: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={`Set a temporary password for ${name}`}
+      title="Set temporary password"
+      className="text-gray-400 hover:text-brand"
+    >
+      <LockKeyhole className="h-4 w-4" />
+    </button>
   );
 }
