@@ -18,6 +18,7 @@ type SroTableProps = {
   onDelete: (sro: Sro) => void;
   onStatusChange: (sro: Sro, status: UserStatus) => void;
   onSendReset: (sro: Sro) => void;
+  onSetPassword: (sro: Sro) => void;
   onManageROs: (sro: Sro) => void;
 };
 
@@ -33,6 +34,7 @@ export function SroTable({
   onDelete,
   onStatusChange,
   onSendReset,
+  onSetPassword,
   onManageROs,
 }: SroTableProps) {
   return (
@@ -97,6 +99,7 @@ export function SroTable({
                         onDelete={onDelete}
                         onStatusChange={onStatusChange}
                         onSendReset={onSendReset}
+                        onSetPassword={onSetPassword}
                       />
                     </div>
                   </td>

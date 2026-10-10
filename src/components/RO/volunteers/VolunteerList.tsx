@@ -6,6 +6,7 @@ import { FilterPills, PageHeader, SearchInput, emptyMessage, inputClass } from "
 import { STATUS_FILTER_OPTIONS, type StatusFilter } from "@/components/Head-of-RO/shared/users";
 import { MemberApprovals } from "@/components/SRO/youth-leaders/YouthLeaderApprovals";
 import { VolunteerTable, type TeamVolunteer } from "./VolunteerTable";
+import { useTemporaryPassword } from "@/components/shared/useTemporaryPassword";
 
 /**
  * Every volunteer under the RO (via their youth leaders), plus the volunteers
@@ -17,6 +18,7 @@ export function VolunteerList() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("All");
   const [leaderFilter, setLeaderFilter] = useState("");
+  const temporaryPassword = useTemporaryPassword();
 
   const leaderOptions = useMemo(() => {
     const byId = new Map<string, string>();
@@ -74,12 +76,15 @@ export function VolunteerList() {
           volunteers={filtered}
           isLoading={isLoading}
           error={error}
+          onSetPassword={temporaryPassword.request}
           emptyMessage={emptyMessage({
             isFiltered: !!search.trim() || statusFilter !== "All" || !!leaderFilter,
             noun: "volunteers",
           })}
         />
       </div>
+
+      {temporaryPassword.dialog}
     </div>
   );
 }

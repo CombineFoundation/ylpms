@@ -118,6 +118,7 @@ export function SroList() {
         onDelete={admin.requestDelete}
         onStatusChange={admin.requestStatusChange}
         onSendReset={admin.requestPasswordReset}
+        onSetPassword={admin.requestSetPassword}
         onManageROs={setManageSro}
       />
       <SroFormModal

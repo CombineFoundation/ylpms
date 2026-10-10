@@ -6,19 +6,20 @@ import { toDate } from "@/utils/aggregation";
 import { logger } from "@/utils/errors";
 
 /**
- * Overall (all-time) performance for every user in the reporting tree:
+ * Overall (all-time) performance for every user in the reporting tree.
  *
- *   performance = 60% activity score + 40% task score
+ * Own score = 60% activity score + 40% task score, from the user's own work:
+ * - Task score: completed ÷ assigned tasks. Cancelled tasks don't count.
+ * - Activity score: of the approved activities they organized that have
+ *   ended, the share that were verified (completed). Cancelled ones, and ones
+ *   still ahead or awaiting approval, don't count. For a volunteer: activities
+ *   they took part in ÷ ended activities they signed up for.
+ * - When only one score exists it's used alone; with neither, it's null.
  *
- * - Task score: completed ÷ assigned tasks across the user's team (the user
- *   plus everyone below them; a volunteer's team is just themselves).
- *   Cancelled tasks don't count.
- * - Activity score: of the approved activities (activities) the team organized
- *   that have ended, the share that were verified (completed). Cancelled ones,
- *   and ones still ahead or awaiting approval, don't count. For a volunteer:
- *   activities they took part in ÷ ended activities they signed up for.
- * - When only one score exists it's used alone; with neither, performance is
- *   null (shown as "—"), not 0.
+ * Performance is then a team average (see scoreFor): a youth leader averages
+ * their own score with each volunteer's; an RO averages their youth leaders,
+ * an SRO their ROs. Unscored members count as 0; with no score anywhere,
+ * performance is null (shown as "—").
  *
  * Product decision: the site shows the score but never explains how it's
  * calculated, so keep the formula out of UI copy.
@@ -159,13 +160,29 @@ function countActivities(activities: ActivityRow[], now: Date) {
 
 const rate = (done: number, total: number) => (total > 0 ? done / total : null);
 
-function scoreFor(node: PerformanceNode): number | null {
-  const taskScore = rate(node.teamTasks.completed, node.teamTasks.assigned);
-  const activityScore = rate(node.teamActivities.completed, node.teamActivities.counted);
+/** A user's score from their own tasks and activities only. */
+function ownScore(node: PerformanceNode): number | null {
+  const taskScore = rate(node.ownTasks.completed, node.ownTasks.assigned);
+  const activityScore = rate(node.ownActivities.completed, node.ownActivities.counted);
   if (taskScore === null && activityScore === null) return null;
   if (taskScore === null) return Math.round(activityScore! * 100);
   if (activityScore === null) return Math.round(taskScore * 100);
   return Math.round((ACTIVITY_WEIGHT * activityScore + TASK_WEIGHT * taskScore) * 100);
+}
+
+/**
+ * Volunteers: their own score. Youth leaders: the average of their own score
+ * and each volunteer's. ROs / SROs: the average of their direct reports (their
+ * own score only when they have none). Unscored members count as 0, unless
+ * nobody in the average has a score.
+ */
+function scoreFor(node: PerformanceNode, nodes: Record<string, PerformanceNode>): number | null {
+  const own = ownScore(node);
+  const childScores = node.childIds.map((childId) => nodes[childId].performance);
+  const scores =
+    node.role === "youth-leader" ? [own, ...childScores] : node.role === "volunteer" || childScores.length === 0 ? [own] : childScores;
+  if (scores.every((score) => score === null)) return null;
+  return Math.round(scores.reduce<number>((sum, score) => sum + (score ?? 0), 0) / scores.length);
 }
 
 /**
@@ -256,7 +273,7 @@ async function buildPerformanceTree(): Promise<PerformanceTree> {
         if (child.role !== "volunteer") addActivities(node.teamActivities, child.teamActivities);
       });
       node.teamSize = members - 1;
-      node.performance = scoreFor(node);
+      node.performance = scoreFor(node, nodes);
       node.childIds.sort(byPerformance(nodes));
       visiting.delete(id);
       return members;

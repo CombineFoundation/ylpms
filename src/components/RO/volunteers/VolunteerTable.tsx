@@ -3,6 +3,7 @@ import { StatusBadge, TableMessageRow } from "@/components/Head-of-RO/shared/Lis
 import { avatarColor } from "@/components/SRO/dashboard/dashboard.types";
 import { performanceColor } from "@/components/SRO/assigned-ros/assigned-ro.types";
 import type { UserRole } from "@/types/user.types";
+import { SetPasswordButton } from "@/components/Head-of-RO/shared/UserRowActions";
 
 /** A volunteer as returned by GET /api/ro/volunteers. */
 export type TeamVolunteer = {
@@ -28,10 +29,12 @@ type VolunteerTableProps = {
   emptyMessage: string;
   /** Hide the "Youth Leader" column when every volunteer reports to the viewer. */
   showManager?: boolean;
+  /** Set a temporary password for a volunteer who hasn't signed in yet. */
+  onSetPassword?: (volunteer: TeamVolunteer) => void;
 };
 
-export function VolunteerTable({ volunteers, isLoading, error, emptyMessage, showManager = true }: VolunteerTableProps) {
-  const colSpan = showManager ? 7 : 6;
+export function VolunteerTable({ volunteers, isLoading, error, emptyMessage, showManager = true, onSetPassword }: VolunteerTableProps) {
+  const colSpan = (showManager ? 7 : 6) + (onSetPassword ? 1 : 0);
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
@@ -44,6 +47,7 @@ export function VolunteerTable({ volunteers, isLoading, error, emptyMessage, sho
             <th className="px-4 py-3">Completed</th>
             <th className="px-4 py-3">Performance</th>
             <th className="px-4 py-3">Status</th>
+            {onSetPassword && <th className="px-4 py-3">Actions</th>}
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-50">
@@ -96,6 +100,13 @@ export function VolunteerTable({ volunteers, isLoading, error, emptyMessage, sho
                 <td className="px-4 py-4">
                   <StatusBadge status={volunteer.status} />
                 </td>
+                {onSetPassword && (
+                  <td className="px-4 py-4">
+                    {volunteer.status === "Pending" && (
+                      <SetPasswordButton name={volunteer.name} onClick={() => onSetPassword(volunteer)} />
+                    )}
+                  </td>
+                )}
               </tr>
             ))}
 

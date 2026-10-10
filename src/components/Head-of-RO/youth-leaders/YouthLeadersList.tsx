@@ -134,6 +134,7 @@ export function YouthLeadersList() {
         onAssignRo={setAssigning}
         onStatusChange={admin.requestStatusChange}
         onSendReset={admin.requestPasswordReset}
+        onSetPassword={admin.requestSetPassword}
       />
 
       <UserDetailModal user={viewing} managerLabel="Reporting Officer" reportsLabel="Volunteers" onClose={() => setViewing(null)} />

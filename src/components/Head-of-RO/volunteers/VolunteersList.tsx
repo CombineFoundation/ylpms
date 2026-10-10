@@ -86,6 +86,7 @@ export function VolunteersList() {
         onLoadMore={list.loadMore}
         onView={setViewing}
         onSendReset={admin.requestPasswordReset}
+        onSetPassword={admin.requestSetPassword}
       />
 
       <UserDetailModal user={viewing} managerLabel="Reports to" onClose={() => setViewing(null)} />

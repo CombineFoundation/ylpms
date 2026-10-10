@@ -10,9 +10,10 @@ type RoTableRowProps = {
   onDelete: (ro: Ro) => void;
   onStatusChange: (ro: Ro, status: UserStatus) => void;
   onSendReset: (ro: Ro) => void;
+  onSetPassword: (ro: Ro) => void;
 };
 
-export function RoTableRow({ ro, onEdit, onDelete, onStatusChange, onSendReset }: RoTableRowProps) {
+export function RoTableRow({ ro, onEdit, onDelete, onStatusChange, onSendReset, onSetPassword }: RoTableRowProps) {
   return (
     <tr className="hover:bg-gray-50/60">
       <td className="px-6 py-4">
@@ -33,7 +34,7 @@ export function RoTableRow({ ro, onEdit, onDelete, onStatusChange, onSendReset }
         <StatusBadge status={ro.status} />
       </td>
       <td className="px-6 py-4">
-        <UserRowActions user={ro} onEdit={onEdit} onDelete={onDelete} onStatusChange={onStatusChange} onSendReset={onSendReset} />
+        <UserRowActions user={ro} onEdit={onEdit} onDelete={onDelete} onStatusChange={onStatusChange} onSendReset={onSendReset} onSetPassword={onSetPassword} />
       </td>
     </tr>
   );

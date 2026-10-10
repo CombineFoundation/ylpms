@@ -15,6 +15,7 @@ type RoTableProps = {
   onDelete: (ro: Ro) => void;
   onStatusChange: (ro: Ro, status: UserStatus) => void;
   onSendReset: (ro: Ro) => void;
+  onSetPassword: (ro: Ro) => void;
 };
 
 export function RoTable({
@@ -29,6 +30,7 @@ export function RoTable({
   onDelete,
   onStatusChange,
   onSendReset,
+  onSetPassword,
 }: RoTableProps) {
   return (
     <div className="overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm">
@@ -60,6 +62,7 @@ export function RoTable({
                   onDelete={onDelete}
                   onStatusChange={onStatusChange}
                   onSendReset={onSendReset}
+                  onSetPassword={onSetPassword}
                 />
               ))}
 
